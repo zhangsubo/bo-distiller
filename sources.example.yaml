@@ -1,0 +1,25 @@
+# Bo-Distiller 内容源配置示例
+
+sources:
+  # Cubox 收藏
+  - type: cubox
+    name: "Cubox 收藏"
+    identifier: "cubox export"  # CLI 命令
+    enabled: true
+  
+  # 本地 Markdown 文件夹示例
+  - type: local_markdown
+    name: "技术笔记"
+    identifier: "/Users/username/Documents/tech-notes"
+    enabled: true
+  
+  - type: local_markdown
+    name: "阅读笔记"
+    identifier: "/Users/username/Documents/reading-notes"
+    enabled: false  # 可以暂时禁用
+  
+  # 可以添加更多本地文件夹
+  # - type: local_markdown
+  #   name: "工作笔记"
+  #   identifier: "/Users/username/Documents/work-notes"
+  #   enabled: true

@@ -1,0 +1,100 @@
+# Bo-Distiller 配置文件示例
+
+# 项目基础配置
+project:
+  name: "bo-distiller"
+  output_dir: "./output"
+  cache_dir: ".cache"
+
+# LLM 配置
+llm:
+  # 调用方式：direct (直接 API) / agent_cli (通过 Agent CLI)
+  call_mode: "direct"
+  
+  # 默认提供商
+  default_provider: "deepseek"
+  
+  # Agent CLI 配置（仅当 call_mode=agent_cli 时使用）
+  agent_cli:
+    name: "claude"  # claude / pi / hermes
+    session_timeout: 120
+  
+  # 提供商配置
+  providers:
+    deepseek:
+      api_key: "${DEEPSEEK_API_KEY}"
+      api_base: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      max_context: 64000
+      max_output: 4000
+    
+    mimo:
+      api_key: "${MIMO_API_KEY}"
+      api_base: "https://token-plan-cn.xiaomimimo.com/v1"
+      model: "mimo-2.5-pro"
+      max_context: 128000
+      max_output: 8000
+    
+    minimax:
+      api_key: "${MINIMAX_API_KEY}"
+      api_base: "https://api.minimaxi.com/v1"
+      model: "abab6.5-chat"
+      max_context: 245000
+      max_output: 8000
+    
+    kimi:
+      api_key: "${MOONSHOT_API_KEY}"
+      api_base: "https://api.moonshot.cn/v1"
+      model: "moonshot-v1-128k"
+      max_context: 128000
+      max_output: 8000
+
+# 处理参数
+processing:
+  # Token 预算
+  max_context: 128000  # 继承自选定的 LLM
+  max_output: 8000
+  reserved_tokens: 2000
+  safety_margin: 0.9
+  
+  # 温度控制
+  batch_temperature: 0.3       # 批次提取温度（保守）
+  synthesis_temperature: 0.2   # 知识整合温度（系统化）
+  
+  # 文章处理
+  max_article_length: 0  # 0 = 完整文章，其他值 = 截取字符数
+
+# 主题发现配置
+topic_discovery:
+  method: "hybrid"  # keyword / embedding / hybrid
+  min_articles_per_topic: 3
+  max_topics: 20
+  enable_hierarchical: false  # Phase 2
+  
+  # 向量聚类参数
+  embedding_model: "paraphrase-multilingual-MiniLM-L12-v2"
+  clustering_algorithm: "dbscan"  # kmeans / dbscan
+  
+  # 关键词匹配参数
+  min_keyword_score: 1
+  enable_dynamic_discovery: true
+
+# 输出配置
+output:
+  # 飞书知识库
+  feishu:
+    enabled: true
+    space_id: "${FEISHU_SPACE_ID}"
+    structure: "flat"  # flat / hierarchical
+  
+  # 本地 Markdown
+  local:
+    enabled: true
+    dir: "./output"
+    include_sources: true  # 是否生成原文合集
+
+# 功能开关
+features:
+  incremental_update: true
+  knowledge_graph: false  # Phase 2
+  vector_search: false    # Phase 3

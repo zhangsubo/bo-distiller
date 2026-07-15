@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 缓存和状态文件
+.cache/
+*.pkl
+*.json
+
+# 输出文件
+output/
+
+# 环境变量
+.env
+.env.local
+
+# 配置文件（使用 .example 作为模板）
+config.yaml
+sources.yaml
+prompts.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# 临时文件
+*.log
+*.tmp
+temp/
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/

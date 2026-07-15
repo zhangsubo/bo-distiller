@@ -1,0 +1,321 @@
+# Bo-Distiller 主题配置
+# 基于 2697 篇 Cubox 文章的 CLASSIFICATION_REPORT 分析结果优化
+# 更新日期: 2026-07-13
+
+# ============ 预定义主题 ============
+predefined_topics:
+
+  # 核心主题：AI 编程工具（高频：skill 209次, agent 195次, claude 185次）
+  AI编程工具:
+    keywords:
+      - "Claude"
+      - "claude"
+      - "Codex"
+      - "codex"
+      - "OpenClaw"
+      - "openclaw"
+      - "Agent"
+      - "agent"
+      - "Skill"
+      - "skill"
+      - "智能体"
+      - "多智能体"
+      - "AI编程"
+      - "AI 编程"
+      - "Gemini"
+      - "Cursor"
+    prompt_key: "tech"
+    parent: null
+    description: "AI 驱动的编程工具和 Agent 系统"
+    priority: 1  # 最高优先级
+
+  # 开源项目（78篇）
+  开源项目:
+    keywords:
+      - "开源"
+      - "GitHub"
+      - "github"
+      - "Star"
+      - "star"
+      - "开源项目"
+      - "仓库"
+      - "项目推荐"
+      - "神器"
+    prompt_key: "tech"
+    parent: null
+    description: "热门开源项目和 GitHub 仓库"
+    priority: 2
+
+  # Claude 专题（78篇，与 AI编程工具 有重叠但更聚焦）
+  Claude专题:
+    keywords:
+      - "Claude Code"
+      - "CLAUDE.md"
+      - "Claude"
+      - "claude"
+      - "Anthropic"
+      - "claude-4"
+      - "sonnet"
+      - "opus"
+    prompt_key: "tech"
+    parent: "AI编程工具"
+    description: "Claude 相关的使用技巧和最佳实践"
+    priority: 3
+
+  # 编程技术
+  编程开发:
+    keywords:
+      - "code"
+      - "编程"
+      - "开发"
+      - "代码"
+      - "API"
+      - "api"
+      - "架构"
+      - "设计模式"
+      - "技术"
+      - "后端"
+      - "前端"
+      - "Python"
+      - "JavaScript"
+      - "TypeScript"
+    prompt_key: "tech"
+    parent: null
+    description: "编程技术和软件开发相关"
+    priority: 4
+
+  # 工具软件
+  工具软件:
+    keywords:
+      - "工具"
+      - "软件"
+      - "神器"
+      - "终端"
+      - "Terminal"
+      - "Mac"
+      - "Obsidian"
+      - "VSCode"
+      - "效率工具"
+    prompt_key: "general"
+    parent: null
+    description: "实用工具和软件推荐"
+    priority: 5
+
+  # 教程指南
+  教程指南:
+    keywords:
+      - "教程"
+      - "指南"
+      - "入门"
+      - "实战"
+      - "手把手"
+      - "详解"
+      - "完整"
+      - "从0到1"
+      - "保姆级"
+      - "一文搞定"
+    prompt_key: "general"
+    parent: null
+    description: "技术教程和实践指南"
+    priority: 6
+
+  # 数据资产（40篇专题文章）
+  数据资产:
+    keywords:
+      - "数据资产"
+      - "入表"
+      - "融资"
+      - "估值"
+      - "ABS"
+      - "城投"
+      - "数据要素"
+      - "数据价值"
+    prompt_key: "investment"
+    parent: null
+    description: "数据资产相关的财经内容"
+    priority: 7
+
+  # AI 模型与技术
+  AI模型:
+    keywords:
+      - "模型"
+      - "LLM"
+      - "llm"
+      - "GPT"
+      - "gpt"
+      - "DeepSeek"
+      - "deepseek"
+      - "大模型"
+      - "token"
+      - "Token"
+      - "prompt"
+      - "Prompt"
+    prompt_key: "tech"
+    parent: null
+    description: "大语言模型和 AI 技术"
+    priority: 8
+
+  # 产品设计
+  产品设计:
+    keywords:
+      - "产品"
+      - "设计"
+      - "用户体验"
+      - "UX"
+      - "UI"
+      - "原型"
+      - "PRD"
+      - "交互设计"
+    prompt_key: "product"
+    parent: null
+    description: "产品设计和用户体验"
+    priority: 9
+
+  # 效率方法
+  效率方法:
+    keywords:
+      - "效率"
+      - "工作流"
+      - "自动化"
+      - "workflow"
+      - "生产力"
+      - "方法论"
+      - "最佳实践"
+    prompt_key: "thinking"
+    parent: null
+    description: "效率提升和工作方法"
+    priority: 10
+
+  # AI 应用场景
+  AI应用:
+    keywords:
+      - "AI"
+      - "人工智能"
+      - "AIGC"
+      - "生成式AI"
+      - "AI写作"
+      - "AI绘画"
+      - "AI视频"
+    prompt_key: "tech"
+    parent: null
+    description: "AI 在各领域的应用"
+    priority: 11
+
+  # 自媒体与内容创作
+  自媒体:
+    keywords:
+      - "公众号"
+      - "小红书"
+      - "抖音"
+      - "自媒体"
+      - "内容创作"
+      - "运营"
+      - "涨粉"
+    prompt_key: "general"
+    parent: null
+    description: "自媒体运营和内容创作"
+    priority: 12
+
+# ============ 层次化主题 ============
+hierarchy:
+
+  AI编程工具:
+    - Claude系列:
+        keywords: ["Claude", "Claude Code", "CLAUDE.md", "Anthropic"]
+    - Codex系列:
+        keywords: ["Codex", "codex", "OpenAI"]
+    - OpenClaw系列:
+        keywords: ["OpenClaw", "openclaw"]
+    - Agent框架:
+        keywords: ["Agent", "agent", "多智能体", "智能体"]
+    - Skill系统:
+        keywords: ["Skill", "skill", "技能", "技能系统"]
+
+  开源项目:
+    - GitHub热门:
+        keywords: ["GitHub", "star", "Star", "热门项目"]
+    - 工具类:
+        keywords: ["开源工具", "开源神器", "效率工具"]
+    - 框架类:
+        keywords: ["框架", "开源框架", "开发框架"]
+
+  编程开发:
+    - 后端开发:
+        keywords: ["后端", "API", "数据库", "架构", "Python"]
+    - 前端开发:
+        keywords: ["前端", "React", "Vue", "JavaScript", "TypeScript"]
+    - DevOps:
+        keywords: ["部署", "CI/CD", "Docker", "K8s"]
+
+# ============ 主题发现参数 ============
+discovery:
+  method: "hybrid"  # keyword / embedding / hybrid
+  min_articles_per_topic: 3
+  max_topics: 25
+  enable_hierarchical: true
+
+  # 向量聚类参数
+  embedding_model: "paraphrase-multilingual-MiniLM-L12-v2"
+  clustering_algorithm: "dbscan"  # kmeans / dbscan
+
+  # 关键词匹配参数
+  min_keyword_score: 1
+  enable_dynamic_discovery: true
+
+# ============ 去重配置 ============
+deduplication:
+  enabled: true
+  method: "title_similarity"  # title_exact / title_similarity / content_hash
+  similarity_threshold: 0.85  # 标题相似度阈值（0-1），降低以捕获更多相似文章
+
+# ============ 分类优先级 ============
+# 当文章匹配多个主题时，按此顺序选择
+classification_priority:
+  - "数据资产"      # 专业性强，优先
+  - "Claude专题"    # 核心兴趣专题
+  - "AI编程工具"    # 核心兴趣
+  - "教程指南"      # 实用性高
+  - "开源项目"
+  - "编程开发"
+  - "AI模型"
+  - "AI应用"
+  - "产品设计"
+  - "工具软件"
+  - "效率方法"
+  - "自媒体"
+
+# ============ 统计信息（自动生成）============
+# 基于 2697 篇文章的 CLASSIFICATION_REPORT 分析结果
+stats:
+  total_articles: 2697
+  analysis_date: "2026-07-13"
+  data_source: "Cubox"
+  main_sources:
+    - "微信公众号: 2296篇 (85%)"
+    - "小红书: 47篇"
+    - "微博: 41篇"
+  time_range: "2025年8月 - 2026年7月"
+  top_keywords:
+    - skill: 209
+    - agent: 195
+    - claude: 185
+    - openclaw: 174
+    - code: 163
+  key_clusters:
+    - name: "OpenClaw"
+      count: 98
+      description: "多 Agent 协同开发工具"
+    - name: "Skill 管理"
+      count: 86
+      description: "Agent 技能系统"
+    - name: "开源项目"
+      count: 78
+      description: "GitHub 项目推荐"
+    - name: "Claude 相关"
+      count: 78
+      description: "Claude Code 使用技巧"
+    - name: "数据资产"
+      count: 40
+      description: "企业数据资产入表"
+  duplicate_groups: 103
+  potential_clusters: 20

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bo-Distiller - 智能内容蒸馏工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 250px;
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+        }
+        
+        .sidebar h1 {
+            font-size: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .nav-item {
+            padding: 12px 15px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .nav-item:hover {
+            background: #34495e;
+        }
+        
+        .nav-item.active {
+            background: #3498db;
+        }
+        
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+        
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        /* 卡片 */
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        /* 表单 */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        /* 按钮 */
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        button.primary {
+            background: #3498db;
+            color: white;
+        }
+        
+        button.primary:hover {
+            background: #2980b9;
+        }
+        
+        button.secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        button.secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        /* 表格 */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        /* 状态标记 */
+        .status {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+        }
+        
+        .status.ok {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .status.error {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        /* Markdown 内容 */
+        .markdown-content {
+            line-height: 1.6;
+            color: #333;
+        }
+        
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .markdown-content pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        
+        .markdown-content code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <h1>Bo-Distiller</h1>
+            <div class="nav-item" 
+                 :class="{active: currentPage === 'config'}"
+                 @click="currentPage = 'config'">
+                ⚙️ 配置管理
+            </div>
+            <div class="nav-item"
+                 :class="{active: currentPage === 'sources'}"
+                 @click="currentPage = 'sources'">
+                📂 内容源
+            </div>
+            <div class="nav-item"
+                 :class="{active: currentPage === 'knowledge'}"
+                 @click="currentPage = 'knowledge'">
+                📚 知识库
+            </div>
+            <div class="nav-item"
+                 :class="{active: currentPage === 'status'}"
+                 @click="currentPage = 'status'">
+                📊 状态监控
+            </div>
+        </div>
+        
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 配置管理页面 -->
+            <div class="page" :class="{active: currentPage === 'config'}">
+                <h2>配置管理</h2>
+                
+                <div class="card">
+                    <h3>LLM 提供商</h3>
+                    <div class="form-group">
+                        <label>调用模式</label>
+                        <select v-model="config.llm.call_mode">
+                            <option value="direct">直接 API</option>
+                            <option value="opencode">通过 OpenCode</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>默认提供商</label>
+                        <select v-model="config.llm.default_provider">
+                            <option value="deepseek">DeepSeek</option>
+                            <option value="mimo">Xiaomi Mimo</option>
+                            <option value="minimax">MiniMax</option>
+                            <option value="kimi">Kimi-code</option>
+                        </select>
+                    </div>
+                    <button @click="saveConfig" class="primary">保存配置</button>
+                    <button @click="testLLM" class="secondary">测试连接</button>
+                </div>
+            </div>
+            
+            <!-- 内容源页面 -->
+            <div class="page" :class="{active: currentPage === 'sources'}">
+                <h2>内容源管理</h2>
+                
+                <div class="card">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>名称</th>
+                                <th>类型</th>
+                                <th>状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="source in sources" :key="source.name">
+                                <td>{{ source.name }}</td>
+                                <td>{{ source.type }}</td>
+                                <td>
+                                    <span class="status ok">✓</span>
+                                </td>
+                                <td>
+                                    <button class="secondary">编辑</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 知识库页面 -->
+            <div class="page" :class="{active: currentPage === 'knowledge'}">
+                <h2>知识库</h2>
+                
+                <div class="card">
+                    <div v-if="documents.length === 0">
+                        <p>暂无生成的知识文档</p>
+                        <p>请先运行蒸馏流程</p>
+                    </div>
+                    <div v-else>
+                        <ul>
+                            <li v-for="doc in documents" :key="doc.name"
+                                @click="loadDocument(doc.name)"
+                                style="cursor: pointer; padding: 10px; margin-bottom: 5px; background: #f8f9fa; border-radius: 4px;">
+                                {{ doc.name }}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="card" v-if="currentDoc">
+                    <h3>{{ currentDoc.name }}</h3>
+                    <div class="markdown-content" v-html="renderedContent"></div>
+                </div>
+            </div>
+            
+            <!-- 状态监控页面 -->
+            <div class="page" :class="{active: currentPage === 'status'}">
+                <h2>状态监控</h2>
+                
+                <div class="card">
+                    <h3>系统状态</h3>
+                    <p>状态: {{ systemStatus.status }}</p>
+                    <p>输出文档数: {{ systemStatus.output_documents }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    currentPage: 'config',
+                    config: {
+                        llm: {
+                            call_mode: 'opencode',
+                            default_provider: 'mimo'
+                        }
+                    },
+                    sources: [],
+                    documents: [],
+                    currentDoc: null,
+                    renderedContent: '',
+                    systemStatus: {
+                        status: 'idle',
+                        output_documents: 0
+                    }
+                }
+            },
+            async mounted() {
+                await this.loadConfig();
+                await this.loadSources();
+                await this.loadDocuments();
+                await this.loadStatus();
+            },
+            methods: {
+                async loadConfig() {
+                    try {
+                        const res = await fetch('/api/config');
+                        const data = await res.json();
+                        this.config = data.config;
+                    } catch (e) {
+                        console.error('加载配置失败', e);
+                    }
+                },
+                async saveConfig() {
+                    try {
+                        const res = await fetch('/api/config', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify(this.config)
+                        });
+                        const data = await res.json();
+                        alert(data.message);
+                    } catch (e) {
+                        alert('保存失败: ' + e.message);
+                    }
+                },
+                async testLLM() {
+                    alert('测试功能开发中...');
+                },
+                async loadSources() {
+                    try {
+                        const res = await fetch('/api/sources');
+                        const data = await res.json();
+                        this.sources = data.sources;
+                    } catch (e) {
+                        console.error('加载内容源失败', e);
+                    }
+                },
+                async loadDocuments() {
+                    try {
+                        const res = await fetch('/api/knowledge');
+                        const data = await res.json();
+                        this.documents = data.documents;
+                    } catch (e) {
+                        console.error('加载文档列表失败', e);
+                    }
+                },
+                async loadDocument(docName) {
+                    try {
+                        const res = await fetch(`/api/knowledge/${docName}`);
+                        const data = await res.json();
+                        this.currentDoc = data;
+                        this.renderedContent = marked.parse(data.content);
+                    } catch (e) {
+                        console.error('加载文档失败', e);
+                    }
+                },
+                async loadStatus() {
+                    try {
+                        const res = await fetch('/api/status');
+                        const data = await res.json();
+                        this.systemStatus = data;
+                    } catch (e) {
+                        console.error('加载状态失败', e);
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
