@@ -43,6 +43,15 @@ class KnowledgeSynthesizer:
         self.config = self.config_manager.load_config()
         self.prompts = self.config_manager.load_prompts()
 
+        # 主题名 -> prompt_key 映射（topics.yaml 中的主题是中文名，
+        # 直接用主题名在 prompts.yaml 里找不到对应提示词，需经 prompt_key 中转）
+        try:
+            self.topic_prompt_keys = {
+                t.name: t.prompt_key for t in self.config_manager.load_topics()
+            }
+        except Exception:
+            self.topic_prompt_keys = {}
+
         # 初始化 tokenizer
         try:
             self.tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
@@ -196,8 +205,14 @@ class KnowledgeSynthesizer:
         # 构建输入文本
         articles_text = self.format_articles_for_prompt(articles)
 
-        # 获取提示词
-        prompt_template = self.prompts.get(topic) or self.prompts.get("general")
+        # 获取提示词：先按主题的 prompt_key 查，再按主题名查，最后回退 general
+        prompt_key = self.topic_prompt_keys.get(topic)
+        prompt_template = self.prompts.get(prompt_key) if prompt_key else None
+        prompt_template = (
+            prompt_template
+            or self.prompts.get(topic)
+            or self.prompts.get("general")
+        )
         base_system_prompt = prompt_template.system if prompt_template else "请从文章中提取核心观点。"
 
         # 添加引用要求

@@ -19,10 +19,12 @@ from .models import (
     ProcessingConfig,
     ProviderConfig,
     SourceConfig,
+    SyncConfig,
     SystemConfig,
     TopicConfig,
     TopicDiscoveryConfig,
     PromptTemplate,
+    WeChatConfig,
 )
 
 console = Console()
@@ -199,6 +201,8 @@ class ConfigManager:
         processing_raw = raw_config.get("processing", {})
         topic_raw = raw_config.get("topic_discovery", {})
         output_raw = raw_config.get("output", {})
+        sync_raw = raw_config.get("sync", {})
+        wechat_raw = raw_config.get("wechat", {})
 
         # 解析 LLM 配置
         providers = {}
@@ -226,6 +230,10 @@ class ConfigManager:
             include_sources=output_raw.get("local", {}).get("include_sources", True),
         ) if output_raw else OutputConfig()
 
+        # 解析定时同步与微信下载配置（带默认值，旧配置文件可正常加载）
+        sync_config = SyncConfig(**sync_raw) if sync_raw else SyncConfig()
+        wechat_config = WeChatConfig(**wechat_raw) if wechat_raw else WeChatConfig()
+
         return SystemConfig(
             project_name=project.get("name", "bo-distiller"),
             output_dir=project.get("output_dir", "./output"),
@@ -234,6 +242,8 @@ class ConfigManager:
             processing=processing_config,
             topic_discovery=topic_config,
             output=output_config,
+            sync=sync_config,
+            wechat=wechat_config,
         )
 
     def _substitute_env_vars(self, config: Any) -> Any:

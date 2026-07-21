@@ -94,6 +94,18 @@ class SQLiteStorage:
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_docs_topic ON knowledge_docs(topic);
+
+                -- 微信文章下载队列表
+                CREATE TABLE IF NOT EXISTS wechat_downloads (
+                    article_id TEXT PRIMARY KEY,
+                    url TEXT,
+                    status TEXT DEFAULT 'pending',
+                    attempts INTEGER DEFAULT 0,
+                    last_error TEXT,
+                    files TEXT,  -- JSON
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
             """)
 
     # ==================== 文章操作 ====================
@@ -350,6 +362,113 @@ class SQLiteStorage:
                 'db_path': str(self.db_path),
                 'db_size': self.db_path.stat().st_size if self.db_path.exists() else 0
             }
+
+    # ==================== 微信文章下载队列 ====================
+
+    def get_articles_by_url_like(self, pattern: str) -> List[Article]:
+        """按 URL 模糊匹配查询文章"""
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM articles WHERE url LIKE ? ORDER BY fetched_date DESC",
+                (f"%{pattern}%",)
+            ).fetchall()
+            return [self._row_to_article(row) for row in rows]
+
+    def enqueue_downloads(self, items: List[Dict]) -> int:
+        """登记微信下载任务（INSERT OR IGNORE），返回新登记数量"""
+        inserted = 0
+        with self._get_conn() as conn:
+            for item in items:
+                cursor = conn.execute(
+                    "INSERT OR IGNORE INTO wechat_downloads (article_id, url) VALUES (?, ?)",
+                    (item["article_id"], item.get("url"))
+                )
+                inserted += cursor.rowcount
+        return inserted
+
+    def get_pending_downloads(self, limit: int = 10) -> List[Dict]:
+        """获取待下载任务（按登记时间升序）"""
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM wechat_downloads WHERE status = 'pending' ORDER BY created_at LIMIT ?",
+                (limit,)
+            ).fetchall()
+            return [self._row_to_download(row) for row in rows]
+
+    def get_download(self, article_id: str) -> Optional[Dict]:
+        """获取单条下载任务"""
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM wechat_downloads WHERE article_id = ?", (article_id,)
+            ).fetchone()
+            if row:
+                return self._row_to_download(row)
+        return None
+
+    def update_download_status(self, article_id: str, status: str,
+                               error: str = None, files: Dict = None) -> None:
+        """更新下载任务状态；标记 failed 时 attempts 自动 +1"""
+        with self._get_conn() as conn:
+            conn.execute("""
+                UPDATE wechat_downloads
+                SET status = ?,
+                    last_error = COALESCE(?, last_error),
+                    files = COALESCE(?, files),
+                    attempts = attempts + ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE article_id = ?
+            """, (
+                status,
+                error,
+                json.dumps(files, ensure_ascii=False) if files else None,
+                1 if status == "failed" else 0,
+                article_id,
+            ))
+
+    def reset_downloading_to_pending(self) -> int:
+        """将 downloading 状态重置为 pending（崩溃恢复），返回重置数量"""
+        with self._get_conn() as conn:
+            cursor = conn.execute("""
+                UPDATE wechat_downloads
+                SET status = 'pending', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'downloading'
+            """)
+            return cursor.rowcount
+
+    def reset_failed_to_pending(self) -> int:
+        """将 failed 状态重置为 pending（失败重试），返回重置数量"""
+        with self._get_conn() as conn:
+            cursor = conn.execute("""
+                UPDATE wechat_downloads
+                SET status = 'pending', updated_at = CURRENT_TIMESTAMP
+                WHERE status = 'failed'
+            """)
+            return cursor.rowcount
+
+    def get_download_stats(self) -> Dict:
+        """获取下载任务统计（按状态计数）"""
+        stats = {"pending": 0, "downloading": 0, "done": 0, "failed": 0}
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT status, COUNT(*) as count FROM wechat_downloads GROUP BY status"
+            ).fetchall()
+            for row in rows:
+                stats[row["status"]] = row["count"]
+        return stats
+
+    @staticmethod
+    def _row_to_download(row) -> Dict:
+        """将数据库行转换为下载任务字典"""
+        return {
+            "article_id": row["article_id"],
+            "url": row["url"],
+            "status": row["status"],
+            "attempts": row["attempts"],
+            "last_error": row["last_error"],
+            "files": json.loads(row["files"]) if row["files"] else {},
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
 
 
 # 全局单例

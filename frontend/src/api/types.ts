@@ -131,6 +131,61 @@ export interface SourceConfig {
   enabled: boolean;
 }
 
+// 定时同步
+export interface SyncStatus {
+  enabled: boolean;
+  interval_minutes: number;
+  incremental: boolean;
+  last_sync: string | null;
+  next_run_time: string | null;
+}
+
+export interface SyncConfigPayload {
+  enabled: boolean;
+  interval_minutes: number;
+  incremental: boolean;
+}
+
+// 微信下载
+export interface WeChatConfig {
+  enabled: boolean;
+  api_base: string;
+  api_token: string;
+  storage_dir: string;
+  formats: string[];
+  requests_per_minute: number;
+  download_on_sync: boolean;
+  write_back_content: boolean;
+  localize_images: boolean;
+}
+
+export interface WeChatStats {
+  pending: number;
+  downloading: number;
+  done: number;
+  failed: number;
+}
+
+export interface WeChatCurrent {
+  article_id: string | null;
+  title: string | null;
+  worker_alive: boolean;
+}
+
+export interface WeChatStatus {
+  stats: WeChatStats;
+  current: WeChatCurrent;
+  enabled: boolean;
+}
+
+// 提示词
+export interface PromptTemplate {
+  system?: string;
+  user_template?: string;
+}
+
+export type PromptsConfig = Record<string, PromptTemplate | Record<string, unknown>>;
+
 // Topics 配置 (YAML 结构)
 export interface TopicsConfig {
   predefined_topics: Record<string, {
