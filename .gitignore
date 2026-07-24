@@ -40,6 +40,11 @@ config.yaml
 sources.yaml
 prompts.yaml
 
+# WeChat exporter
+wechat-exporter/wechat_articles/
+wechat-exporter/*.db
+wechat-exporter/config.yaml
+
 # IDE
 .vscode/
 .idea/
