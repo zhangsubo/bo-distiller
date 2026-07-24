@@ -88,7 +88,8 @@ class CuboxAdapter(SourceAdapter):
         # 保存到 SQLite
         if self.use_sqlite and self._storage and articles:
             saved = self._storage.save_articles(articles)
-            console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 文章[/dim]")
+            dupes = self._storage.mark_url_duplicates()
+            console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 文章，标记 {dupes} 条重复 URL[/dim]")
 
         # 保存状态（最新文章的时间戳）
         if articles:
@@ -158,7 +159,8 @@ class CuboxAdapter(SourceAdapter):
         # 保存到 SQLite
         if self.use_sqlite and self._storage and articles:
             saved = self._storage.save_articles(articles)
-            console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 增量文章[/dim]")
+            dupes = self._storage.mark_url_duplicates()
+            console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 增量文章，标记 {dupes} 条重复 URL[/dim]")
 
         # 更新状态
         if articles:

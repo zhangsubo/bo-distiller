@@ -105,6 +105,14 @@ class ContentAggregator:
         if duplicates > 0:
             console.print(f"[yellow]去重：移除 {duplicates} 篇重复文章[/yellow]")
 
+        # 过滤数据库中标记的 URL 重复文章
+        if self.use_sqlite and self._storage:
+            before_count = len(unique_articles)
+            unique_articles = self._storage.filter_url_duplicates(unique_articles)
+            url_dupes = before_count - len(unique_articles)
+            if url_dupes > 0:
+                console.print(f"[yellow]URL 重复：移除 {url_dupes} 篇[/yellow]")
+
         # 保存到 SQLite（如果不是由适配器单独保存的话）
         if self.use_sqlite and self._storage and not incremental:
             saved = self._storage.save_articles(unique_articles)

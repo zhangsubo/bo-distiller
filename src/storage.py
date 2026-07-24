@@ -53,6 +53,7 @@ class SQLiteStorage:
                     published_date TEXT,
                     fetched_date TEXT NOT NULL,
                     metadata TEXT,  -- JSON
+                    url_duplicate INTEGER DEFAULT 0,  -- 0=正常, 1=URL重复
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
@@ -94,19 +95,15 @@ class SQLiteStorage:
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_docs_topic ON knowledge_docs(topic);
-
-                -- 微信文章下载队列表
-                CREATE TABLE IF NOT EXISTS wechat_downloads (
-                    article_id TEXT PRIMARY KEY,
-                    url TEXT,
-                    status TEXT DEFAULT 'pending',
-                    attempts INTEGER DEFAULT 0,
-                    last_error TEXT,
-                    files TEXT,  -- JSON
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-                );
             """)
+
+            # 迁移：检查并添加 url_duplicate 字段
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(articles)").fetchall()}
+            if "url_duplicate" not in columns:
+                conn.execute("ALTER TABLE articles ADD COLUMN url_duplicate INTEGER DEFAULT 0")
+                console.print("[dim]>> 数据库迁移：添加 url_duplicate 字段[/dim]")
+                # 对已有数据执行一次重复标记
+                self._mark_url_duplicates_impl(conn)
 
     # ==================== 文章操作 ====================
 
@@ -252,6 +249,43 @@ class SQLiteStorage:
             fetched_date=datetime.fromisoformat(row['fetched_date']) if row['fetched_date'] else datetime.now(),
             metadata=json.loads(row['metadata']) if row['metadata'] else {}
         )
+
+    # ==================== URL 重复标记 ====================
+
+    def _mark_url_duplicates_impl(self, conn) -> int:
+        """在已有事务中标记 URL 重复（内部实现）"""
+        # 先标记所有为非重复
+        conn.execute("UPDATE articles SET url_duplicate = 0")
+        # 找出重复 URL（保留每组中 rowid 最小的一条）
+        conn.execute("""
+            UPDATE articles SET url_duplicate = 1
+            WHERE url IS NOT NULL AND url != '' AND rowid NOT IN (
+                SELECT MIN(rowid) FROM articles
+                WHERE url IS NOT NULL AND url != ''
+                GROUP BY url
+            )
+        """)
+        return conn.total_changes
+
+    def mark_url_duplicates(self) -> int:
+        """标记 URL 重复的文章（同一 URL 只保留最早的一条为 0）"""
+        with self._get_conn() as conn:
+            changes = self._mark_url_duplicates_impl(conn)
+        return changes
+
+    def filter_url_duplicates(self, articles: List[Article]) -> List[Article]:
+        """过滤掉数据库中标记为 URL 重复的文章"""
+        if not articles:
+            return articles
+        ids_to_check = [a.id for a in articles]
+        placeholders = ",".join("?" * len(ids_to_check))
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                f"SELECT id FROM articles WHERE id IN ({placeholders}) AND url_duplicate = 1",
+                ids_to_check
+            ).fetchall()
+        duplicate_ids = {row["id"] for row in rows}
+        return [a for a in articles if a.id not in duplicate_ids]
 
     # ==================== 同步状态操作 ====================
 

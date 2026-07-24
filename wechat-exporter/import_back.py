@@ -32,6 +32,26 @@ def extract_id_prefix(dir_name: str):
     return m.group(1) if m else None
 
 
+def load_url_map(urls_file: Path) -> dict:
+    """从 urls.jsonl 加载 id[:8] -> 完整 URL 的映射
+
+    Returns:
+        dict: {id_prefix_8chars: full_url}
+    """
+    url_map = {}
+    if not urls_file.exists():
+        return url_map
+    with open(urls_file, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            item = json.loads(line)
+            if "id" in item and "url" in item:
+                url_map[item["id"][:8]] = item["url"]
+    return url_map
+
+
 def read_content(article_dir: Path, min_len: int):
     """读取正文：优先 article.md，缺失则用 article.html 转纯文本
 
@@ -63,17 +83,27 @@ def read_content(article_dir: Path, min_len: int):
     return content, files
 
 
-def find_article(conn, id_prefix: str):
-    """按 id 前缀匹配 articles 行，返回 (row, 匹配数)"""
+def find_article_by_url(conn, url: str):
+    """按 URL 精确匹配 articles 行（排除重复），返回 (row, 匹配数)
+
+    优先返回 url_duplicate=0 的记录；若全部是重复的，返回 None。
+    """
     rows = conn.execute(
-        "SELECT id, url, content, metadata FROM articles WHERE id LIKE ?",
-        (f"{id_prefix}%",),
+        "SELECT id, url, content, metadata, url_duplicate FROM articles WHERE url = ?",
+        (url,),
     ).fetchall()
-    return (rows[0] if rows else None), len(rows)
+    if not rows:
+        return None, 0
+    # 优先返回非重复记录
+    non_dupes = [r for r in rows if r["url_duplicate"] != 1]
+    if non_dupes:
+        return non_dupes[0], len(rows)
+    # 全部是重复的，返回 None
+    return None, len(rows)
 
 
 def import_one(db_path: Path, article_dir: Path, id_prefix: str,
-               min_len: int, dry_run: bool) -> str:
+               url_map: dict, min_len: int, dry_run: bool) -> str:
     """回灌单篇，返回结果类别：updated / skipped / unmatched / invalid / error
 
     每篇独立事务，出错回滚不影响其他文章。
@@ -82,21 +112,29 @@ def import_one(db_path: Path, article_dir: Path, id_prefix: str,
     if content is None:
         return "invalid"
 
+    # 从 url_map 获取完整 URL
+    full_url = url_map.get(id_prefix)
+    if not full_url:
+        log(f"  警告: id 前缀 {id_prefix} 在 urls.jsonl 中未找到对应 URL，跳过")
+        return "unmatched"
+
+    # 只处理微信文章
+    if WECHAT_URL_KEYWORD not in full_url:
+        log(f"  警告: id 前缀 {id_prefix} 对应的不是微信文章 URL，跳过: {full_url[:60]}")
+        return "unmatched"
+
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     try:
-        row, match_count = find_article(conn, id_prefix)
+        row, match_count = find_article_by_url(conn, full_url)
         if row is None:
-            return "unmatched"
-        if match_count > 1:
-            log(f"  警告: id 前缀 {id_prefix} 匹配到 {match_count} 篇文章，跳过（撞车保护）")
+            if match_count > 0:
+                log(f"  跳过: URL 的所有记录均为重复标记: {full_url[:80]}")
+                return "skipped"
+            log(f"  警告: URL 在 articles 表中未匹配: {full_url[:80]}")
             return "unmatched"
 
         article_id = row["id"]
-        url = row["url"] or ""
-        if WECHAT_URL_KEYWORD not in url:
-            log(f"  警告: {article_id} 不是微信文章 URL，跳过（前缀撞车保护）: {url[:60]}")
-            return "unmatched"
 
         # 已是全文或无变化则跳过
         old_content = row["content"] or ""
@@ -127,7 +165,7 @@ def import_one(db_path: Path, article_dir: Path, id_prefix: str,
                 conn.execute("""
                     INSERT INTO wechat_downloads (article_id, url, status, files)
                     VALUES (?, ?, 'done', ?)
-                """, (article_id, url, json.dumps(files, ensure_ascii=False)))
+                """, (article_id, full_url, json.dumps(files, ensure_ascii=False)))
             elif existing["status"] != "done":
                 conn.execute("""
                     UPDATE wechat_downloads SET status = 'done', files = ?, last_error = NULL,
@@ -148,6 +186,7 @@ def main():
     parser = argparse.ArgumentParser(description="把 wechat_articles 产物回灌进 distiller.db")
     parser.add_argument("--articles-dir", default="./wechat_articles", help="下载产物根目录")
     parser.add_argument("--db", default="../data/distiller.db", help="distiller.db 路径")
+    parser.add_argument("--urls", help="urls.jsonl 路径（默认自动查找）")
     parser.add_argument("--dry-run", action="store_true", help="只打印将做什么，不写库")
     parser.add_argument("--min-content-len", type=int, default=200,
                         help="正文短于此值认为无效跳过（默认 200）")
@@ -159,6 +198,17 @@ def main():
         raise SystemExit(f"产物目录不存在: {articles_dir}")
     if not db_path.exists():
         raise SystemExit(f"数据库不存在: {db_path}")
+
+    # 加载 urls.jsonl 构建 id[:8] -> URL 映射
+    if args.urls:
+        urls_file = Path(args.urls)
+    else:
+        # 自动查找：先尝试 articles-dir 的父目录/wechat-exporter/，再尝试脚本同目录
+        urls_file = Path(args.articles_dir).parent / "wechat-exporter" / "urls.jsonl"
+        if not urls_file.exists():
+            urls_file = Path(__file__).parent / "urls.jsonl"
+    url_map = load_url_map(urls_file)
+    log(f"从 {urls_file} 加载了 {len(url_map)} 条 URL 映射")
 
     # 递归扫描 月份目录/文章目录/article.md|html
     article_dirs = sorted(
@@ -178,7 +228,7 @@ def main():
             unmatched.append(("(无前缀)", article_dir.name))
             continue
 
-        result = import_one(db_path, article_dir, id_prefix,
+        result = import_one(db_path, article_dir, id_prefix, url_map,
                             args.min_content_len, args.dry_run)
         stats[result] += 1
         if result == "unmatched":
