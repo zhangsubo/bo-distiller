@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# Node
+frontend/node_modules
+frontend/dist
+
+# Data (will be mounted as volumes)
+data/
+output/
+.cache/
+
+# Config files (may contain secrets)
+config.yaml
+sources.yaml
+prompts.yaml
+.env
+
+# Docker
+Dockerfile
+docker-compose.yml
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+tests/
+pytest.ini
+.coverage
+htmlcov/

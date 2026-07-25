@@ -1,0 +1,22 @@
+# Bo-Distiller Docker Compose
+# 使用 OrbStack 本地启动
+
+services:
+  bo-distiller:
+    build: .
+    container_name: bo-distiller
+    ports:
+      - "8000:8000"
+    volumes:
+      # 数据持久化
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./.cache:/app/.cache
+      # 配置文件（可选，取消注释以使用本地配置）
+      # - ./config.yaml:/app/config.yaml
+      # - ./sources.yaml:/app/sources.yaml
+      # - ./prompts.yaml:/app/prompts.yaml
+    environment:
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    # OrbStack 会自动处理网络，无需额外配置
