@@ -7,9 +7,33 @@
 ✅ **Week 1 完成** - 核心框架已实现  
 ✅ **分类系统升级完成** - 智能分析与分类功能已上线
 
-## 🆕 最新功能（2026-07-13）
+## 🆕 最新功能
 
-### 🎯 Cubox 内容智能分析
+### 🎉 微信公众号本地化下载工具（2026-07-25）
+
+全新的微信文章下载方案，**完全本地化，无需第三方 API**：
+
+- ✅ **本地化运行**：直接调用微信公众平台 API，无外部依赖
+- ✅ **扫码登录**：一次认证，7 天有效
+- ✅ **公众号搜索**：关键词快速定位目标公众号
+- ✅ **批量下载**：支持 Markdown 和 HTML 双格式
+- ✅ **断点续传**：基于 SQLite 的任务状态管理
+
+**快速开始**：
+```bash
+# 1. 扫码登录
+./venv/bin/python cli/wechat_native.py login
+
+# 2. 同步文章列表
+./venv/bin/python cli/wechat_native.py sync "公众号名称"
+
+# 3. 下载文章
+./venv/bin/python cli/wechat_native.py download
+```
+
+📖 [详细文档](./WECHAT_NATIVE_QUICKSTART.md) | 📋 [技术方案](./.claude/plans/wechat-integration.md)
+
+### 🎯 Cubox 内容智能分析（2026-07-13）
 
 已完成对 **2,697 篇** Cubox 文章的深度分析：
 - ✅ 识别 20+ 个主题聚类
