@@ -9,6 +9,7 @@ const SettingsPage = lazy(() => import('./pages/settings/index'));
 const DistillPage = lazy(() => import('./pages/distill/index'));
 const KnowledgePage = lazy(() => import('./pages/knowledge/index'));
 const KnowledgeViewer = lazy(() => import('./pages/knowledge/KnowledgeViewer'));
+const WechatNativePage = lazy(() => import('./pages/wechat/index'));
 
 const Loading = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -24,6 +25,7 @@ const App: React.FC = () => {
           <Route path="/" element={<Navigate to="/articles" replace />} />
           <Route path="/articles" element={<ArticlesPage />} />
           <Route path="/articles/:id" element={<ArticleDetail />} />
+          <Route path="/wechat" element={<WechatNativePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/distill" element={<DistillPage />} />
           <Route path="/knowledge" element={<KnowledgePage />} />

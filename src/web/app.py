@@ -25,6 +25,7 @@ from src.web.routers import (
     system,
     topics,
     wechat,
+    wechat_native,
 )
 
 
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(system.router)
     app.include_router(sync.router)
     app.include_router(wechat.router)
+    app.include_router(wechat_native.router)
     app.include_router(prompts.router)
 
     # ==================== 前端静态文件托管 ====================

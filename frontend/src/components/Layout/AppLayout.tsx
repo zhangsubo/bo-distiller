@@ -5,6 +5,7 @@ import {
   SettingOutlined,
   ThunderboltOutlined,
   BookOutlined,
+  WechatOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
@@ -13,6 +14,7 @@ const { Sider, Content, Header } = Layout;
 
 const menuItems = [
   { key: '/articles', icon: <DatabaseOutlined />, label: 'Cubox 内容' },
+  { key: '/wechat', icon: <WechatOutlined />, label: '微信下载' },
   { key: '/distill', icon: <ThunderboltOutlined />, label: '蒸馏进度' },
   { key: '/knowledge', icon: <BookOutlined />, label: '知识库' },
   { key: '/settings', icon: <SettingOutlined />, label: '设置' },
