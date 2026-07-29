@@ -52,6 +52,10 @@ class ConfigManager:
 
         Returns:
             验证后的系统配置对象
+
+        Raises:
+            FileNotFoundError: 配置文件不存在
+            ValueError: 配置格式错误或验证失败
         """
         config_path = self.config_dir / config_file
 
@@ -63,16 +67,33 @@ class ConfigManager:
             with open(config_path, "r", encoding="utf-8") as f:
                 raw_config = yaml.safe_load(f) or {}
 
+            if not raw_config:
+                console.print("[yellow]警告: 配置文件为空，使用默认配置[/yellow]")
+                return SystemConfig()
+
             # 环境变量替换
             raw_config = self._substitute_env_vars(raw_config)
 
             # 转换为 SystemConfig
             config = self._parse_system_config(raw_config)
+
+            # 验证配置完整性
+            self._validate_config(config)
+
             self._config_cache["system"] = config
             return config
 
+        except yaml.YAMLError as e:
+            console.print(f"[red]YAML 格式错误: {e}[/red]")
+            console.print("[yellow]使用默认配置[/yellow]")
+            return SystemConfig()
+        except ValueError as e:
+            console.print(f"[red]配置验证失败: {e}[/red]")
+            console.print("[yellow]使用默认配置[/yellow]")
+            return SystemConfig()
         except Exception as e:
-            console.print(f"[yellow]警告: 加载配置失败 ({e})，使用默认配置[/yellow]")
+            console.print(f"[red]加载配置失败: {e}[/red]")
+            console.print("[yellow]使用默认配置[/yellow]")
             return SystemConfig()
 
     def load_sources(self, sources_file: str = "sources.yaml") -> List[SourceConfig]:
@@ -106,6 +127,9 @@ class ConfigManager:
             self._config_cache["sources"] = sources
             return sources
 
+        except yaml.YAMLError as e:
+            console.print(f"[red]YAML 格式错误: {e}[/red]")
+            return []
         except Exception as e:
             console.print(f"[red]加载源配置失败: {e}[/red]")
             return []
@@ -139,6 +163,9 @@ class ConfigManager:
             self._config_cache["prompts"] = prompts
             return prompts
 
+        except yaml.YAMLError as e:
+            console.print(f"[red]YAML 格式错误: {e}[/red]")
+            return self._get_default_prompts()
         except Exception as e:
             console.print(f"[yellow]警告: 加载提示词失败 ({e})，使用默认提示词[/yellow]")
             return self._get_default_prompts()
@@ -189,6 +216,9 @@ class ConfigManager:
             self._config_cache["topics"] = topics
             return topics
 
+        except yaml.YAMLError as e:
+            console.print(f"[red]YAML 格式错误: {e}[/red]")
+            return []
         except Exception as e:
             console.print(f"[red]加载主题配置失败: {e}[/red]")
             return []
@@ -230,7 +260,7 @@ class ConfigManager:
             include_sources=output_raw.get("local", {}).get("include_sources", True),
         ) if output_raw else OutputConfig()
 
-        # 解析定时同步与微信下载配置（带默认值，旧配置文件可正常加载）
+        # 解析定时同步与微信下载配置
         sync_config = SyncConfig(**sync_raw) if sync_raw else SyncConfig()
         wechat_config = WeChatConfig(**wechat_raw) if wechat_raw else WeChatConfig()
 
@@ -247,12 +277,26 @@ class ConfigManager:
         )
 
     def _substitute_env_vars(self, config: Any) -> Any:
-        """递归替换环境变量 ${VAR_NAME}"""
+        """递归替换环境变量
+
+        支持格式:
+        - ${VAR_NAME} - 使用环境变量，不存在则保留原始字符串
+        - ${VAR_NAME:-default} - 使用环境变量，不存在则使用默认值
+        """
         if isinstance(config, str):
-            # 替换 ${VAR_NAME} 格式
             def replace_env(match):
-                var_name = match.group(1)
-                return os.getenv(var_name, match.group(0))
+                var_spec = match.group(1)
+                # 支持 ${VAR:-default} 语法
+                if ':-' in var_spec:
+                    var_name, default = var_spec.split(':-', 1)
+                    return os.getenv(var_name, default)
+                else:
+                    var_name = var_spec
+                    value = os.getenv(var_name)
+                    if value is None:
+                        # 保留原始占位符以便识别未解析的变量
+                        return match.group(0)
+                    return value
 
             return re.sub(r"\$\{([^}]+)\}", replace_env, config)
         elif isinstance(config, dict):
@@ -260,6 +304,27 @@ class ConfigManager:
         elif isinstance(config, list):
             return [self._substitute_env_vars(item) for item in config]
         return config
+
+    def _validate_config(self, config: SystemConfig) -> None:
+        """验证配置完整性和一致性
+
+        Raises:
+            ValueError: 配置不一致或缺少必需项
+        """
+        # 检查飞书配置
+        if config.output.feishu_enabled and not config.output.feishu_space_id:
+            raise ValueError("启用飞书输出但未配置 space_id")
+
+        # 检查 LLM 提供商配置
+        for name, provider in config.llm.providers.items():
+            if not provider.api_key:
+                console.print(f"[yellow]警告: {name} 提供商未配置 API key[/yellow]")
+            elif provider.api_key.startswith("${"):
+                console.print(f"[yellow]警告: {name} 提供商的 API key 环境变量未解析: {provider.api_key}[/yellow]")
+
+        # 检查默认提供商存在性
+        if config.llm.default_provider not in config.llm.providers:
+            raise ValueError(f"默认提供商 {config.llm.default_provider} 未定义")
 
     def _get_default_prompts(self) -> Dict[str, PromptTemplate]:
         """获取默认提示词"""
@@ -290,6 +355,9 @@ class ConfigManager:
 
         Returns:
             提供商配置
+
+        Raises:
+            ValueError: 提供商不存在
         """
         config = self._config_cache.get("system")
         if not config:
@@ -323,16 +391,25 @@ class ConfigManager:
         return output_dir
 
 
-# 全局配置管理器实例
-_config_manager: Optional[ConfigManager] = None
+# 支持多配置目录的全局配置管理器
+_config_managers: Dict[str, ConfigManager] = {}
 
 
 def get_config_manager(config_dir: str = ".") -> ConfigManager:
-    """获取全局配置管理器实例"""
-    global _config_manager
-    if _config_manager is None:
-        _config_manager = ConfigManager(config_dir)
-    return _config_manager
+    """获取配置管理器实例
+
+    支持多配置目录，每个目录维护独立的配置管理器实例。
+
+    Args:
+        config_dir: 配置目录路径
+
+    Returns:
+        配置管理器实例
+    """
+    abs_dir = str(Path(config_dir).resolve())
+    if abs_dir not in _config_managers:
+        _config_managers[abs_dir] = ConfigManager(abs_dir)
+    return _config_managers[abs_dir]
 
 
 def load_config(config_dir: str = ".") -> SystemConfig:

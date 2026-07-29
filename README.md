@@ -2,77 +2,59 @@
 
 智能内容蒸馏工具 - 将收藏的文章提炼成体系化知识文档
 
+## 核心功能
+
+- **Cubox 内容分析与智能分类** - 自动主题聚类、重复检测、关键词提取
+- **微信公众号本地化下载** - 无需第三方 API，支持批量下载和断点续传
+- **知识蒸馏合成** - 两阶段 LLM 提炼，将多源内容整合成结构化知识文档
+
+## 快速开始
+
+```bash
+# 1. 安装依赖
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. 配置环境
+cp .env.example .env
+# 编辑 .env 填入 API Key
+
+# 3. 快速体验
+python distill.py wechat login          # 微信下载工具
+python analyze_cubox_content.py        # Cubox 内容分析
+python distill.py run --limit 10        # 知识蒸馏（测试模式）
+```
+
+📖 **详细指南**：[QUICK_START.md](QUICK_START.md)
+
 ## 项目状态
 
-✅ **Week 1 完成** - 核心框架已实现  
-✅ **分类系统升级完成** - 智能分析与分类功能已上线
+✅ **v0.2.0** - 微信公众号下载工具已发布  
+✅ **v0.1.0** - Cubox 智能分析与分类系统已上线  
+✅ **v0.0.1** - 核心蒸馏框架已实现
 
-## 🆕 最新功能
+查看完整变更：[CHANGELOG.md](CHANGELOG.md)
 
-### 🎉 微信公众号本地化下载工具（2026-07-25）
+## 文档导航
 
-全新的微信文章下载方案，**完全本地化，无需第三方 API**：
+### 使用指南
+- [Cubox 内容分析与分类](docs/guide/cubox-classification.md)
+- [微信公众号下载工具](docs/guide/wechat-download.md)
 
-- ✅ **本地化运行**：直接调用微信公众平台 API，无外部依赖
-- ✅ **扫码登录**：一次认证，7 天有效
-- ✅ **公众号搜索**：关键词快速定位目标公众号
-- ✅ **批量下载**：支持 Markdown 和 HTML 双格式
-- ✅ **断点续传**：基于 SQLite 的任务状态管理
+### 设计文档
+完整的架构和设计文档位于 `Reference_myself/` 目录：
+- [00. 项目概述](Reference_myself/00.%20README.md)
+- [01. 架构设计](Reference_myself/01.%20架构设计.md)
+- [02. 核心机制设计](Reference_myself/02-core-mechanisms.md)
+- [03. 多源内容聚合](Reference_myself/03-multi-source-aggregation.md)
 
-**快速开始**：
-```bash
-# 1. 扫码登录
-./venv/bin/python cli/wechat_native.py login
+### 分析报告
+- [Cubox 分类报告](docs/reports/classification-report.md)
+- [Web UI 状态](docs/reports/web-ui-status.md)
 
-# 2. 同步文章列表
-./venv/bin/python cli/wechat_native.py sync "公众号名称"
-
-# 3. 下载文章
-./venv/bin/python cli/wechat_native.py download
-```
-
-📖 [详细文档](./WECHAT_NATIVE_QUICKSTART.md) | 📋 [技术方案](./.claude/plans/wechat-integration.md)
-
-### 🎯 Cubox 内容智能分析（2026-07-13）
-
-已完成对 **2,697 篇** Cubox 文章的深度分析：
-- ✅ 识别 20+ 个主题聚类
-- ✅ 检测 103 组重复文章
-- ✅ 高频关键词提取
-- ✅ 同一软件/主题文章聚合
-
-### 🚀 快速体验
-
-```bash
-# 分析你的 Cubox 内容
-python analyze_cubox_content.py
-
-# 智能分类（自动去重）
-python classify_upgrade.py --method keyword
-
-# 查看详细报告
-cat CLASSIFICATION_REPORT.md
-```
-
-**详细文档**: 
-- [完整分析报告](./CLASSIFICATION_REPORT.md)
-- [快速开始指南](./QUICKSTART_CLASSIFICATION.md)
-- [项目总结](./SUMMARY.md)
-
-## 快速导航
-
-### 📚 设计文档
-
-完整的设计文档位于 `Reference_myself/` 目录：
-
-- [00. README](./Reference_myself/00.%20README.md) - 项目概述与快速开始
-- [01. 架构设计](./Reference_myself/01.%20架构设计.md) - 系统架构、模块设计
-- [02. 核心机制设计](./Reference_myself/02-core-mechanisms.md) - 四大核心机制详解
-- [03. 多源内容聚合](./Reference_myself/03-multi-source-aggregation.md) - 输入源适配器
-- [04. 智能主题发现](./Reference_myself/04-topic-discovery.md) - 动态分类与聚类
-- [05. 知识图谱设计](./Reference_myself/05-knowledge-graph.md) - 关联关系与可视化
-- [06. 技术选型](./Reference_myself/06-tech-stack.md) - 技术栈与依赖
-- [07. 实现路线图](./Reference_myself/07-roadmap.md) - 迭代计划与里程碑
+### 历史归档
+项目演进过程的历史文档：[docs/archives/](docs/archives/)
 
 ## 核心特性
 
@@ -81,83 +63,68 @@ cat CLASSIFICATION_REPORT.md
 - ✅ **智能分批**：Token 预算动态分配
 - ✅ **高度可配置**：YAML 驱动，提示词可定制
 - ✅ **多 LLM 支持**：DeepSeek / Mimo / MiniMax / Kimi
-- 🔜 **多源聚合**：RSS/书签/链接/本地文件（Week 2）
-- 🔜 **智能主题发现**：混合策略（关键词 + 向量）（Week 2）
-- 🔜 **知识图谱**：关联可视化（Phase 2）
+- 🔜 **多源聚合**：RSS/书签/链接/本地文件
+- 🔜 **知识图谱**：关联可视化
+
+## 技术栈
+
+- **语言**：Python 3.9+
+- **AI**：DeepSeek / Mimo / Claude / Qwen
+- **数据处理**：feedparser, trafilatura, beautifulsoup4
+- **ML**：scikit-learn, sentence-transformers
+- **Web**：FastAPI, React
+- **CLI**：click, rich
+
+## CLI 命令速查
+
+```bash
+# 主命令
+python distill.py run              # 运行蒸馏流程
+python distill.py status           # 查看项目状态
+python distill.py serve            # 启动 Web UI
+
+# 微信工具
+python distill.py wechat login     # 扫码登录
+python distill.py wechat sync      # 同步公众号
+python distill.py wechat download  # 下载文章
+
+# 内容源管理
+python distill.py sources add --cubox
+python distill.py sources list
+
+# Cubox 分析
+python analyze_cubox_content.py
+python classify_upgrade.py --method keyword
+```
+
+## 开发计划
+
+- ✅ **Week 1**: 核心框架（模型、配置、LLM 客户端、缓存、合成器）
+- ✅ **Week 2**: Cubox 分析与分类系统
+- ✅ **Week 3**: 微信公众号下载工具
+- 🔜 **Week 4**: CLI 统一与测试完善
+- 🔜 **Week 5**: 多源聚合（RSS、本地文件）
+- 🔜 **Phase 2**: 知识图谱与可视化
 
 ## 与 content-distiller 的对比
 
 | 维度 | content-distiller | bo-distiller |
 |------|-------------------|--------------|
 | 定位 | 学习某个博主的完整体系 | 多源内容的个人知识管理 |
-| 输入源 | 单一/少数 RSS 源 | RSS/书签/链接/本地文件 |
+| 输入源 | 单一/少数 RSS 源 | RSS/Cubox/微信/书签/本地文件 |
 | 分类 | 预定义（投资/育儿/成长） | 动态主题发现 + 自定义 |
 | 输出 | 按分类平铺 | 多层知识体系 |
 
-## 技术栈
+## 贡献
 
-- **语言**：Python 3.9+
-- **AI**：Qwen / DeepSeek / Claude
-- **数据处理**：feedparser, trafilatura, beautifulsoup4
-- **ML**：scikit-learn, sentence-transformers
-- **CLI**：click, rich
-
-## 快速开始
-
-```bash
-# 1. 克隆项目
-cd /Users/zhangsubo/Code/bo-distiller
-
-# 2. 创建虚拟环境并安装依赖
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# 3. 配置环境变量
-cp .env.example .env
-# 编辑 .env 填入 API Key
-
-# 4. 配置内容源
-# 编辑 sources.yaml 添加你的内容源
-
-# 5. 运行蒸馏
-python distill.py run --limit 10  # 测试模式
-python distill.py run             # 完整运行
-```
-
-## 开发计划
-
-- ✅ **Week 1**: 核心框架（模型、配置、LLM 客户端、缓存、合成器）
-- 🔜 **Week 2**: 内容源适配器（RSS、本地 Markdown、Cubox）
-- 🔜 **Week 3**: 主题发现、输出模块、CLI 完善
-
-## 已实现模块
-
-### Week 1: 核心框架
-
-| 模块 | 文件 | 功能 |
-|------|------|------|
-| 数据模型 | `src/models.py` | Article、SourceInfo、SystemConfig 等 Pydantic 模型 |
-| 配置管理 | `src/config.py` | 加载 YAML 配置，环境变量替换 |
-| LLM 客户端 | `src/llm_client.py` | 统一 LLM 调用接口，支持多提供商 |
-| 缓存管理 | `src/cache.py` | 多层缓存，断点续传 |
-| 内容清洗 | `src/processors/cleaner.py` | HTML 清洗、噪音去除 |
-| 知识合成 | `src/synthesizer.py` | 两阶段合成（批次提取 + 知识整合） |
-
-### CLI 命令
-
-```bash
-python distill.py run              # 运行蒸馏流程
-python distill.py run --limit 10   # 测试模式（只处理10篇）
-python distill.py run --model mimo # 使用指定 LLM
-python distill.py status           # 查看项目状态
-python distill.py --clear-cache    # 清除缓存
-```
-
-## 开始阅读
-
-👉 从 [Reference_myself/00. README.md](./Reference_myself/00.%20README.md) 开始了解项目全貌。
+欢迎提交 Issue 和 Pull Request！
 
 ## 协议
 
 MIT License
+
+---
+
+**开始使用**：阅读 [QUICK_START.md](QUICK_START.md)  
+**了解架构**：阅读 [Reference_myself/00. README.md](Reference_myself/00.%20README.md)  
+**获取帮助**：运行 `python distill.py --help`
