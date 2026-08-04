@@ -58,11 +58,14 @@ cat docs/reports/classification-report.md
 # 1. 扫码登录（7天有效）
 python distill.py wechat login
 
-# 2. 搜索并同步公众号
-python distill.py wechat sync "公众号名称"
+# 2. 同步公众号文章列表
+python distill.py wechat sync "公众号名称" --limit 50
 
 # 3. 下载文章（支持 Markdown 和 HTML）
-python distill.py wechat download
+python distill.py wechat download --limit 10
+
+# 4. 查看微信工具状态
+python distill.py wechat status
 ```
 
 **详细指南**: [微信下载工具完整文档](docs/guide/wechat-download.md)
@@ -137,13 +140,15 @@ python distill.py status           # 查看项目状态
 python distill.py serve            # 启动 Web UI
 ```
 
-### 微信工具子命令
+### 微信工具
 
 ```bash
-python distill.py wechat login     # 扫码登录
-python distill.py wechat sync      # 同步公众号列表
-python distill.py wechat download  # 下载文章
-python distill.py wechat status    # 查看下载状态
+python distill.py wechat login              # 扫码登录
+python distill.py wechat sync "公众号"       # 同步文章列表
+python distill.py wechat sync "公众号" --limit 50  # 限制同步数量
+python distill.py wechat download           # 下载所有待处理文章
+python distill.py wechat download --limit 10  # 限制下载数量
+python distill.py wechat status             # 查看下载状态
 ```
 
 ### 内容源管理

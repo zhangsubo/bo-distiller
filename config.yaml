@@ -1,0 +1,80 @@
+features:
+  incremental_update: true
+  knowledge_graph: false
+  vector_search: false
+llm:
+  agent_cli:
+    name: claude
+    session_timeout: 120
+  call_mode: direct
+  default_provider: deepseek
+  providers:
+    deepseek:
+      api_base: https://api.deepseek.com
+      api_key: ${DEEPSEEK_API_KEY}
+      max_context: 64000
+      max_output: 4000
+      model: deepseek-chat
+    kimi:
+      api_base: https://api.moonshot.cn/v1
+      api_key: ${MOONSHOT_API_KEY}
+      max_context: 128000
+      max_output: 8000
+      model: moonshot-v1-128k
+    mimo:
+      api_base: https://token-plan-cn.xiaomimimo.com/v1
+      api_key: ${MIMO_API_KEY}
+      max_context: 128000
+      max_output: 8000
+      model: mimo-2.5-pro
+    minimax:
+      api_base: https://api.minimaxi.com/v1
+      api_key: ${MINIMAX_API_KEY}
+      max_context: 245000
+      max_output: 8000
+      model: abab6.5-chat
+output:
+  feishu:
+    enabled: false
+    space_id: ${FEISHU_SPACE_ID}
+  local:
+    dir: ./output
+    enabled: true
+    include_sources: true
+processing:
+  batch_temperature: 0.3
+  max_article_length: 0
+  max_context: 128000
+  max_output: 8000
+  reserved_tokens: 2000
+  safety_margin: 0.9
+  synthesis_temperature: 0.2
+project:
+  cache_dir: .cache
+  name: bo-distiller
+  output_dir: ./output
+sync:
+  enabled: true
+  incremental: true
+  interval_minutes: 60
+topic_discovery:
+  clustering_algorithm: dbscan
+  embedding_model: paraphrase-multilingual-MiniLM-L12-v2
+  enable_dynamic_discovery: true
+  enable_hierarchical: false
+  max_topics: 20
+  method: hybrid
+  min_articles_per_topic: 3
+  min_keyword_score: 1
+wechat:
+  api_base: https://down.mptext.top
+  api_token: ''
+  download_on_sync: true
+  enabled: true
+  formats:
+  - markdown
+  - html
+  localize_images: true
+  requests_per_minute: 1
+  storage_dir: ./data/wechat_articles
+  write_back_content: true

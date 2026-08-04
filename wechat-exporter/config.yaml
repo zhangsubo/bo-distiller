@@ -1,0 +1,19 @@
+# wechat-exporter 下载器配置
+# 所有配置都在这里改；命令行参数仅用于临时覆盖（优先级高于本文件）
+
+# mptext 公共服务地址，自部署实例可改
+api_base: https://down.mptext.top
+# 会员令牌（X-Api-Token），留空按游客限速
+api_token: ""
+# 每分钟请求数：游客 1，会员 60
+rpm: 1
+# 下载格式，可选 markdown / html
+formats: [markdown, html]
+# 是否把图片下载到本地（关闭则保留 mmbiz 远程链接）
+localize_images: true
+# 文章落盘目录
+output: ./wechat_articles
+# URL 清单
+urls: ./urls.jsonl
+# 断点状态库
+state: ./jobs.db

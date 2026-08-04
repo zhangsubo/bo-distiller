@@ -1,0 +1,20 @@
+# Bo-Distiller 内容源配置示例
+
+sources:
+  # Cubox 收藏
+  - type: cubox
+    name: "Cubox 收藏"
+    identifier: "cubox-cli"
+    enabled: true
+
+  # 本地 Markdown 文件夹示例
+  - type: local_markdown
+    name: "测试笔记"
+    identifier: "/tmp/test-notes"
+    enabled: false
+
+  # 可以添加更多本地文件夹
+  # - type: local_markdown
+  #   name: "工作笔记"
+  #   identifier: "/Users/username/Documents/work-notes"
+  #   enabled: true

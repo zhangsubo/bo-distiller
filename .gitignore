@@ -4,9 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -23,27 +20,10 @@ wheels/
 .installed.cfg
 *.egg
 
-# 缓存和状态文件
-.cache/
-*.pkl
-*.json
-
-# 输出文件
-output/
-
-# 环境变量
-.env
-.env.local
-
-# 配置文件（使用 .example 作为模板）
-config.yaml
-sources.yaml
-prompts.yaml
-
-# WeChat exporter
-wechat-exporter/wechat_articles/
-wechat-exporter/*.db
-wechat-exporter/config.yaml
+# Virtual Environment
+venv/
+ENV/
+env/
 
 # IDE
 .vscode/
@@ -51,17 +31,27 @@ wechat-exporter/config.yaml
 *.swp
 *.swo
 *~
-
-# macOS
 .DS_Store
 
-# 临时文件
-*.log
-*.tmp
-temp/
+# Project specific
+.env
+.cache/
+output/
+data/
+*.db
+*.db-journal
+classification_result.json
+cubox_analysis_report.json
+wechat-exporter/wechat_articles/*
 
-# 测试
+# Test
 .pytest_cache/
 .coverage
 htmlcov/
-data
+.tox/
+
+# CodeKit
+config.codekit3
+
+# Logs
+*.log
