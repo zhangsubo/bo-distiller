@@ -89,6 +89,7 @@ export interface LLMProvider {
   model: string;
   max_context: number;
   max_output: number;
+  enabled_models?: string[]; // 用户启用的模型列表
 }
 
 export interface AppConfig {

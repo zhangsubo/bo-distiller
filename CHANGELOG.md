@@ -8,17 +8,37 @@ Bo-Distiller 项目的所有重要变更都记录在此文件中。
 ## [未发布]
 
 ### 新增
-- 新增 `src/orchestrator.py` — 蒸馏业务编排函数
-- 新增 `src/utils.py` — 共享工具函数（token 计数、文章格式化、引用替换）
-- 新增 `scripts/` 目录 — 独立分析脚本统一存放
+- 🎯 **LLM 元数据管理系统**
+  - 集成 models.dev API 自动获取提供商元数据
+  - 支持 7+ LLM 提供商（DeepSeek, Xiaomi, MiniMax, Moonshot, Kimi, OpenCode, Kimi For Coding）
+  - 30 天缓存机制，支持手动刷新
+  - Base URL、上下文窗口、最大输出自动填充
+- 🔌 **连通性测试功能**
+  - 提供商配置页面添加连通性测试按钮
+  - 测试成功后按钮变绿显示"可连通"
+  - 支持自定义提供商测试
+- 🎨 **动态配置界面**
+  - 只显示选中的提供商配置（按需加载）
+  - 添加"自定义"提供商选项，支持完全手动配置
+  - 只验证当前选中的提供商，其他提供商配置可选填
+- 📊 **模型选择增强**
+  - 模型列表动态从元数据加载
+  - 支持启用/禁用特定模型
+  - 显示模型上下文窗口和最大输出信息
+- 🛠️ **开发工具改进**
+  - 新增 `dev.sh` 脚本统一管理前后端服务
+  - 新增 `AGENT.md` 项目架构文档
+  - 优化日志输出和错误提示
 
 ### 改进
 - 重构 `distill.py` — CLI 定义与业务逻辑分离
-- 重构 `storage.py` — 提取 `_upsert_article` 消除 SQL 重复
+- 重构 `storage.py` — 提取 `_upsert_article` 消除 SQL 重复，新增配置和元数据表
 - 重构 `llm_client.py` — 移除过度设计的 Factory 类，改为模块级单例
 - 重构 `synthesizer.py` — 提取共用工具函数到 `utils.py`
 - 重构 `cache.py` — 移除 pickle，统一使用 JSON 序列化
 - 重构 `web/deps.py` — 移除 `sys.path` hack，统一到 `web/__init__.py`
+- 优化前端 LLM 设置页面，添加元数据管理标签页
+- 移除"调用方式"选择，统一使用直接 API 调用
 
 ### 移除
 - 移除微信公众号下载工具（两个版本均失效）
@@ -26,6 +46,11 @@ Bo-Distiller 项目的所有重要变更都记录在此文件中。
   - 删除 `src/services/wechat_downloader.py`、`wechat_queue.py`
   - 删除前端微信相关页面、API、路由
   - 清理所有配置和文档中的微信引用
+
+### 文档
+- 新增 `AGENT.md` — 完整的项目架构和开发指南
+- 新增 `docs/` 目录 — 整理所有技术文档
+- 更新 `CLAUDE.md` — 简化为引用 AGENT.md
 
 ## [0.2.0] - 2024-07-25
 

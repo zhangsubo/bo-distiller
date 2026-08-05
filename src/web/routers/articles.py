@@ -91,7 +91,7 @@ async def delete_article(article_id: str):
 
 @router.post("/api/articles/sync")
 async def sync_cubox():
-    """同步 Cubox 收藏（逻辑在 sync_service.run_sync，响应结构保持不变）"""
+    """同步 Cubox 收藏（含完整正文、批注、AI 洞见）"""
     try:
         from src.services.sync_service import run_sync
 
@@ -101,6 +101,23 @@ async def sync_cubox():
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/articles/backfill")
+async def backfill_cubox_content(
+    limit: int = Query(0, ge=0, description="最多处理篇数（0=不限制）"),
+):
+    """为已有 Cubox 文章补抓完整正文、批注和 AI 洞见"""
+    try:
+        from src.services.sync_service import backfill_content
+
+        return backfill_content(limit=limit)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
         traceback.print_exc()

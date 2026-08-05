@@ -7,6 +7,15 @@ export const SOURCE_TYPES = [
   { label: 'URL 列表', value: 'url_list' },
 ];
 
-export const LLM_MODELS = ['deepseek', 'mimo', 'minimax', 'kimi'] as const;
+// 支持的 LLM 提供商（与后端保持一致）
+export const LLM_MODELS = [
+  'deepseek',
+  'xiaomi',
+  'xiaomi-token-plan-cn',
+  'minimax',
+  'moonshotai',
+  'kimi-for-coding',
+  'opencode-go',
+] as const;
 
 export const PAGE_SIZE = 20;

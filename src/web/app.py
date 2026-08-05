@@ -26,6 +26,16 @@ from src.web.routers import (
     topics,
 )
 
+# 单独导入 llm 模块以便调试
+try:
+    from src.web.routers import llm
+    print(f"[DEBUG] LLM 模块导入成功，路由数: {len(llm.router.routes)}")
+except Exception as e:
+    print(f"[ERROR] LLM 模块导入失败: {e}")
+    import traceback
+    traceback.print_exc()
+    llm = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -71,6 +81,14 @@ def create_app() -> FastAPI:
     app.include_router(system.router)
     app.include_router(sync.router)
     app.include_router(prompts.router)
+
+    # LLM 元数据管理
+    if llm is not None:
+        print(f"[DEBUG] 注册 LLM 路由...")
+        app.include_router(llm.router)
+        print(f"[DEBUG] LLM 路由已注册")
+    else:
+        print(f"[WARNING] LLM 模块未导入，跳过路由注册")
 
     # ==================== 前端静态文件托管 ====================
 

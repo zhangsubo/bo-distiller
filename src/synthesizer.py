@@ -56,12 +56,11 @@ class KnowledgeSynthesizer:
         self.max_article_length = self.config.processing.max_article_length
 
     def count_tokens(self, text: str) -> int:
-        """统计文本的 token 数量"""
-        try:
-            return len(self.tokenizer.encode(text))
-        except Exception:
-            # Fallback: 粗略估计（中文约 1.5 字符/token）
-            return int(len(text) / 1.5)
+        """统计文本的 token 数量
+
+        使用 LLMClient 的 tokenizer
+        """
+        return self.llm.count_tokens(text)
 
     def create_batches(self, articles: List[Article]) -> List[List[Article]]:
         batches = []

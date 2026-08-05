@@ -1,32 +1,22 @@
 """
 蒸馏控制 API
 
-从 web_ui.py 平移而来，保持原有端点行为不变。
-蒸馏进程状态为本模块的模块级可变状态。
+使用新的任务管理器替代 subprocess，提供更好的进度跟踪和错误处理。
 """
 
 import asyncio
 import json
-import subprocess
-from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from ..tasks import get_task_manager, TaskStatus
+
 router = APIRouter()
 
-# 项目根目录（src/web/routers/distill.py 向上三级）
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-
-_distill_process: Optional[subprocess.Popen] = None
-_distill_status = {
-    "running": False,
-    "step": "idle",
-    "started_at": None,
-    "error": None,
-}
+# 获取任务管理器
+_task_manager = get_task_manager()
 
 
 # ==================== 蒸馏控制 API ====================
@@ -34,33 +24,30 @@ _distill_status = {
 @router.post("/api/distill/start")
 async def start_distill(body: dict):
     """启动蒸馏任务"""
-    global _distill_process, _distill_status
     try:
-        if _distill_status["running"]:
+        current_task = _task_manager.get_current_task()
+        if current_task and current_task.status == TaskStatus.RUNNING:
             raise HTTPException(status_code=409, detail="蒸馏任务已在运行")
 
         model = body.get("model", "minimax")
         incremental = body.get("incremental", True)
+        limit = body.get("limit", None)
 
-        cmd = ["python3", "distill.py", "run", "--model", model]
-        if not incremental:
-            cmd.append("--full")
-
-        _distill_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            cwd=str(_PROJECT_ROOT),
+        task = _task_manager.start_task(
+            model=model,
+            incremental=incremental,
+            limit=limit,
         )
-        _distill_status = {
-            "running": True,
-            "step": "started",
-            "started_at": datetime.now().isoformat(),
-            "error": None,
+
+        return {
+            "status": "ok",
+            "message": "蒸馏任务已启动",
+            "task": {
+                "model": task.model,
+                "incremental": task.incremental,
+                "started_at": task.started_at.isoformat() if task.started_at else None,
+            }
         }
-        return {"status": "ok", "message": "蒸馏任务已启动"}
     except HTTPException:
         raise
     except Exception as e:
@@ -72,69 +59,45 @@ async def start_distill(body: dict):
 @router.post("/api/distill/stop")
 async def stop_distill():
     """停止蒸馏任务"""
-    global _distill_process, _distill_status
-    if _distill_process:
-        _distill_process.terminate()
-        try:
-            _distill_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            _distill_process.kill()
-        _distill_process = None
-    _distill_status["running"] = False
-    _distill_status["step"] = "stopped"
-    return {"status": "ok"}
+    _task_manager.stop_task()
+    return {"status": "ok", "message": "任务已停止"}
 
 
 @router.get("/api/distill/status")
 async def get_distill_status():
     """获取蒸馏状态"""
-    global _distill_process, _distill_status
     try:
-        cache_dir = Path(".cache")
+        task = _task_manager.get_current_task()
 
-        # 从实际文件状态推断进度
-        topics_done = []
-        if (cache_dir / "final").exists():
-            topics_done = [f.stem for f in (cache_dir / "final").glob("*.txt")]
+        if not task:
+            return {
+                "data": {
+                    "running": False,
+                    "step": "idle",
+                    "started_at": None,
+                    "error": None,
+                    "cache": {
+                        "articles_cached": False,
+                        "cleaned_cached": False,
+                        "topics_cached": False,
+                        "batch_count": 0,
+                        "final_count": 0,
+                    },
+                    "topics_done": [],
+                }
+            }
 
-        # 推断当前步骤
-        step = "idle"
-        if _distill_status["running"]:
-            if (cache_dir / "final").exists() and list((cache_dir / "final").glob("*.txt")):
-                step = "synthesize"
-            elif (cache_dir / "topics.pkl").exists():
-                step = "classify"
-            elif (cache_dir / "cleaned.pkl").exists():
-                step = "clean"
-            elif (cache_dir / "articles.pkl").exists():
-                step = "fetch"
-            else:
-                step = "started"
-
-        # 检查子进程是否已结束
-        if _distill_process and _distill_process.poll() is not None:
-            _distill_status["running"] = False
-            if _distill_process.returncode != 0:
-                _distill_status["error"] = f"进程退出码: {_distill_process.returncode}"
-            _distill_status["step"] = "done"
-            _distill_process = None
+        progress = task.get_progress()
 
         return {
             "data": {
-                "running": _distill_status["running"],
-                "step": step,
-                "started_at": _distill_status["started_at"],
-                "error": _distill_status["error"],
-                "cache": {
-                    "articles_cached": (cache_dir / "articles.pkl").exists(),
-                    "cleaned_cached": (cache_dir / "cleaned.pkl").exists(),
-                    "topics_cached": (cache_dir / "topics.pkl").exists(),
-                    "batch_count": len(list((cache_dir / "batches").glob("*.txt")))
-                    if (cache_dir / "batches").exists()
-                    else 0,
-                    "final_count": len(topics_done),
-                },
-                "topics_done": topics_done,
+                "running": progress["status"] == TaskStatus.RUNNING.value,
+                "step": progress["step"],
+                "started_at": progress["started_at"],
+                "finished_at": progress["finished_at"],
+                "error": progress["error"],
+                "cache": progress["cache"],
+                "topics_done": progress["topics_done"],
             }
         }
     except Exception as e:
@@ -148,16 +111,45 @@ async def distill_log_stream():
     """SSE 实时日志流"""
 
     async def event_generator():
-        while _distill_process and _distill_process.poll() is None:
-            line = _distill_process.stdout.readline()
-            if line:
-                yield f"data: {json.dumps({'log': line.strip()})}\n\n"
-            else:
-                await asyncio.sleep(0.1)
-        yield f"data: {json.dumps({'done': True})}\n\n"
+        task = _task_manager.get_current_task()
+        if not task:
+            yield f"data: {json.dumps({'error': '没有运行中的任务'})}\n\n"
+            return
+
+        last_log_index = 0
+
+        while task.status in [TaskStatus.PENDING, TaskStatus.RUNNING]:
+            # 发送新日志
+            if last_log_index < len(task.logs):
+                new_logs = task.logs[last_log_index:]
+                for log in new_logs:
+                    yield f"data: {json.dumps({'log': log})}\n\n"
+                last_log_index = len(task.logs)
+
+            await asyncio.sleep(0.5)
+
+        # 发送完成信号
+        yield f"data: {json.dumps({'done': True, 'status': task.status.value})}\n\n"
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/api/distill/logs")
+async def get_distill_logs(offset: int = 0, limit: int = 100):
+    """获取任务日志（分页）"""
+    task = _task_manager.get_current_task()
+
+    if not task:
+        return {"logs": [], "total": 0}
+
+    logs = task.logs[offset:offset + limit]
+    return {
+        "logs": logs,
+        "total": len(task.logs),
+        "offset": offset,
+        "limit": limit,
+    }
