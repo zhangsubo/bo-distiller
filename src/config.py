@@ -24,7 +24,6 @@ from .models import (
     TopicConfig,
     TopicDiscoveryConfig,
     PromptTemplate,
-    WeChatConfig,
 )
 
 console = Console()
@@ -232,7 +231,6 @@ class ConfigManager:
         topic_raw = raw_config.get("topic_discovery", {})
         output_raw = raw_config.get("output", {})
         sync_raw = raw_config.get("sync", {})
-        wechat_raw = raw_config.get("wechat", {})
 
         # 解析 LLM 配置
         providers = {}
@@ -260,9 +258,8 @@ class ConfigManager:
             include_sources=output_raw.get("local", {}).get("include_sources", True),
         ) if output_raw else OutputConfig()
 
-        # 解析定时同步与微信下载配置
+        # 解析定时同步配置
         sync_config = SyncConfig(**sync_raw) if sync_raw else SyncConfig()
-        wechat_config = WeChatConfig(**wechat_raw) if wechat_raw else WeChatConfig()
 
         return SystemConfig(
             project_name=project.get("name", "bo-distiller"),
@@ -273,7 +270,6 @@ class ConfigManager:
             topic_discovery=topic_config,
             output=output_config,
             sync=sync_config,
-            wechat=wechat_config,
         )
 
     def _substitute_env_vars(self, config: Any) -> Any:

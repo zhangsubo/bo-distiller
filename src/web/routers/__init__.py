@@ -1,6 +1,6 @@
 """Web API 路由包"""
 
-from . import articles, config, distill, knowledge, prompts, sync, system, topics, wechat, wechat_native
+from . import articles, config, distill, knowledge, prompts, sync, system, topics
 
 __all__ = [
     "articles",
@@ -11,6 +11,4 @@ __all__ = [
     "sync",
     "system",
     "topics",
-    "wechat",
-    "wechat_native",
 ]

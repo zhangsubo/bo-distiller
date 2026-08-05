@@ -8,7 +8,6 @@ Bo-Distiller LLM 客户端模块
 import time
 from typing import Callable, Dict, List, Optional
 
-import tiktoken
 from openai import OpenAI
 from rich.console import Console
 
@@ -45,12 +44,6 @@ class LLMClient:
             base_url=self.provider_config.api_base,
         )
         self.model_name = self.provider_config.model
-
-        # 初始化 tokenizer（用于 token 计数）
-        try:
-            self.tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
-        except Exception:
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
 
     def chat(
         self,
@@ -129,19 +122,9 @@ class LLMClient:
         raise last_exception
 
     def count_tokens(self, text: str) -> int:
-        """统计文本的 token 数量
-
-        Args:
-            text: 要统计的文本
-
-        Returns:
-            token 数量
-        """
-        try:
-            return len(self.tokenizer.encode(text))
-        except Exception:
-            # Fallback: 粗略估计（中文约 1.5 字符/token）
-            return int(len(text) / 1.5)
+        """统计文本的 token 数量"""
+        from .utils import count_tokens as _count_tokens
+        return _count_tokens(text)
 
     def batch_chat(
         self,
@@ -170,50 +153,14 @@ class LLMClient:
         return results
 
 
-class LLMClientFactory:
-    """LLM 客户端工厂"""
-
-    _clients: Dict[str, LLMClient] = {}
-
-    @classmethod
-    def get_client(
-        cls,
-        provider: Optional[str] = None,
-        config_manager: Optional[ConfigManager] = None,
-    ) -> LLMClient:
-        """获取 LLM 客户端实例（带缓存）
-
-        Args:
-            provider: 提供商名称
-            config_manager: 配置管理器
-
-        Returns:
-            LLM 客户端实例
-        """
-        cache_key = provider or "default"
-
-        if cache_key not in cls._clients:
-            cls._clients[cache_key] = LLMClient(provider, config_manager)
-
-        return cls._clients[cache_key]
-
-    @classmethod
-    def clear_cache(cls):
-        """清除客户端缓存"""
-        cls._clients.clear()
+_clients: Dict[str, LLMClient] = {}
 
 
 def get_llm_client(
     provider: Optional[str] = None,
     config_manager: Optional[ConfigManager] = None,
 ) -> LLMClient:
-    """获取 LLM 客户端的便捷函数
-
-    Args:
-        provider: 提供商名称
-        config_manager: 配置管理器
-
-    Returns:
-        LLM 客户端实例
-    """
-    return LLMClientFactory.get_client(provider, config_manager)
+    cache_key = provider or "default"
+    if cache_key not in _clients:
+        _clients[cache_key] = LLMClient(provider, config_manager)
+    return _clients[cache_key]

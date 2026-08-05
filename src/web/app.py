@@ -24,8 +24,6 @@ from src.web.routers import (
     sync,
     system,
     topics,
-    wechat,
-    wechat_native,
 )
 
 
@@ -38,15 +36,6 @@ async def lifespan(app: FastAPI):
     # 定时同步调度器（enabled=false 时也启动，便于动态开启）
     try:
         start_scheduler()
-    except Exception:
-        traceback.print_exc()
-
-    # 微信下载 worker（含崩溃恢复，不做自动扫描入队）
-    try:
-        if get_config_manager().load_config().wechat.enabled:
-            from src.services.wechat_queue import start_worker
-
-            start_worker()
     except Exception:
         traceback.print_exc()
 
@@ -81,8 +70,6 @@ def create_app() -> FastAPI:
     app.include_router(distill.router)
     app.include_router(system.router)
     app.include_router(sync.router)
-    app.include_router(wechat.router)
-    app.include_router(wechat_native.router)
     app.include_router(prompts.router)
 
     # ==================== 前端静态文件托管 ====================

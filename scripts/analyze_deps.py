@@ -141,7 +141,7 @@ class DependencyAnalyzer:
     def find_unused_modules(self) -> Set[str]:
         """查找未被使用的模块"""
         # 根目录入口脚本不算未使用
-        entry_points = {'distill', 'web_ui', 'analyze_content', 'classify_upgrade', 'cli.wechat_native'}
+        entry_points = {'distill', 'web_ui', 'analyze_content', 'classify_upgrade'}
 
         unused = set()
         for module in self.all_modules:

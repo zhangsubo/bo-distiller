@@ -5,11 +5,8 @@ Cubox 同步服务
 """
 
 from datetime import datetime
-from typing import List
 
 from rich.console import Console
-
-from src.config import get_config_manager
 
 console = Console()
 
@@ -21,7 +18,7 @@ def run_sync(incremental: bool = False) -> dict:
         incremental: 是否增量同步（基于上次同步时间）
 
     Returns:
-        同步结果字典（status/message/count/wechat_enqueued）
+        同步结果字典（status/message/count）
 
     Raises:
         ValueError: Cubox CLI 不可用
@@ -55,20 +52,8 @@ def run_sync(incremental: bool = False) -> dict:
     else:
         articles = adapter.fetch(source_config)
 
-    # 同步后自动入队微信文章下载（配置启用时）
-    wechat_enqueued = 0
-    try:
-        wechat_config = get_config_manager().load_config().wechat
-        if wechat_config.enabled and wechat_config.download_on_sync:
-            from src.services.wechat_queue import enqueue_wechat_articles
-            wechat_enqueued = enqueue_wechat_articles(articles)
-    except Exception as e:
-        # 入队失败不影响同步结果
-        console.print(f"[yellow]微信文章入队失败: {e}[/yellow]")
-
     return {
         "status": "ok",
         "message": f"同步完成，获取 {len(articles)} 篇文章",
         "count": len(articles),
-        "wechat_enqueued": wechat_enqueued,
     }

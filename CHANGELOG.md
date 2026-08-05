@@ -8,35 +8,39 @@ Bo-Distiller 项目的所有重要变更都记录在此文件中。
 ## [未发布]
 
 ### 新增
-- 完成代码和文档整理
-- 统一快速开始指南
-- 创建文档目录结构
+- 新增 `src/orchestrator.py` — 蒸馏业务编排函数
+- 新增 `src/utils.py` — 共享工具函数（token 计数、文章格式化、引用替换）
+- 新增 `scripts/` 目录 — 独立分析脚本统一存放
+
+### 改进
+- 重构 `distill.py` — CLI 定义与业务逻辑分离
+- 重构 `storage.py` — 提取 `_upsert_article` 消除 SQL 重复
+- 重构 `llm_client.py` — 移除过度设计的 Factory 类，改为模块级单例
+- 重构 `synthesizer.py` — 提取共用工具函数到 `utils.py`
+- 重构 `cache.py` — 移除 pickle，统一使用 JSON 序列化
+- 重构 `web/deps.py` — 移除 `sys.path` hack，统一到 `web/__init__.py`
+
+### 移除
+- 移除微信公众号下载工具（两个版本均失效）
+  - 删除 `wechat-exporter/`、`src/services/wechat_native/`
+  - 删除 `src/services/wechat_downloader.py`、`wechat_queue.py`
+  - 删除前端微信相关页面、API、路由
+  - 清理所有配置和文档中的微信引用
 
 ## [0.2.0] - 2024-07-25
 
 ### 新增
-- 🎉 微信公众号本地化下载工具
-  - 扫码登录，7 天有效期
-  - 公众号搜索与同步
-  - 批量下载（Markdown + HTML）
-  - 断点续传支持
 - Web UI 集成
-  - 微信认证管理界面
-  - 公众号管理界面
-  - 下载任务管理
 - Docker 支持
   - 完整的 Docker 镜像
   - docker-compose 配置
   - 本地配置挂载
 
 ### 改进
-- 优化限速策略，避免触发微信反爬虫
 - 改进 SQLite 数据库结构
 - 增强错误处理和日志记录
 
 ### 文档
-- 新增微信工具快速开始指南
-- 新增微信工具完整文档
 - 新增 Web 集成文档
 - 新增 Docker 使用说明
 
@@ -110,7 +114,6 @@ Bo-Distiller 项目的所有重要变更都记录在此文件中。
 
 ### v0.4.0 - CLI 统一
 - [ ] 统一 CLI 入口
-- [ ] 微信工具集成到主命令
 - [ ] 改进内容源管理
 - [ ] 增强错误提示
 

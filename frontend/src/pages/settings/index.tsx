@@ -6,7 +6,6 @@ import {
   ExportOutlined,
   DatabaseOutlined,
   SyncOutlined,
-  WechatOutlined,
   FileTextOutlined,
 } from '@ant-design/icons';
 import LLMSettings from './LLMSettings';
@@ -14,7 +13,6 @@ import TopicSettings from './TopicSettings';
 import OutputSettings from './OutputSettings';
 import SourceSettings from './SourceSettings';
 import SyncSettings from './SyncSettings';
-import WeChatSettings from './WeChatSettings';
 import PromptSettings from './PromptSettings';
 
 const tabItems = [
@@ -47,11 +45,6 @@ const tabItems = [
     key: 'sync',
     label: <span><SyncOutlined /> 定时同步</span>,
     children: <SyncSettings />,
-  },
-  {
-    key: 'wechat',
-    label: <span><WechatOutlined /> 微信下载</span>,
-    children: <WeChatSettings />,
   },
 ];
 

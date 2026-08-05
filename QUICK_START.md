@@ -37,10 +37,10 @@ cp .env.example .env
 
 ```bash
 # 分析 Cubox 内容
-python analyze_cubox_content.py
+python scripts/analyze_cubox_content.py
 
 # 智能分类（自动去重）
-python classify_upgrade.py --method keyword
+python scripts/classify_upgrade.py --method keyword
 
 # 查看分析报告
 cat docs/reports/classification-report.md
@@ -48,29 +48,7 @@ cat docs/reports/classification-report.md
 
 **详细指南**: [Cubox 分类系统完整文档](docs/guide/cubox-classification.md)
 
-### 2. 微信公众号本地化下载
-
-完全本地化的微信公众号文章下载工具,无需第三方 API。
-
-**5 分钟上手**:
-
-```bash
-# 1. 扫码登录（7天有效）
-python distill.py wechat login
-
-# 2. 同步公众号文章列表
-python distill.py wechat sync "公众号名称" --limit 50
-
-# 3. 下载文章（支持 Markdown 和 HTML）
-python distill.py wechat download --limit 10
-
-# 4. 查看微信工具状态
-python distill.py wechat status
-```
-
-**详细指南**: [微信下载工具完整文档](docs/guide/wechat-download.md)
-
-### 3. 内容蒸馏（核心功能）
+### 2. 内容蒸馏（核心功能）
 
 将多源收藏内容提炼成体系化知识文档。
 
@@ -92,32 +70,16 @@ python distill.py status
 
 ```bash
 # 1. 分析内容,找出重复和主题
-python analyze_cubox_content.py
+python scripts/analyze_cubox_content.py
 
 # 2. 查看分析报告
 cat cubox_analysis_report.json
 
 # 3. 基于关键词智能分类
-python classify_upgrade.py --method keyword
+python scripts/classify_upgrade.py --method keyword
 ```
 
-### 场景 2: 批量下载公众号历史文章
-
-```bash
-# 1. 登录微信公众平台
-python distill.py wechat login
-
-# 2. 同步目标公众号
-python distill.py wechat sync "科技博客" --max 100
-
-# 3. 批量下载
-python distill.py wechat download --limit 50
-
-# 4. 查看下载状态
-python distill.py wechat status
-```
-
-### 场景 3: 构建个人知识库
+### 场景 2: 构建个人知识库
 
 ```bash
 # 1. 配置多个内容源（sources.yaml）
@@ -140,17 +102,6 @@ python distill.py status           # 查看项目状态
 python distill.py serve            # 启动 Web UI
 ```
 
-### 微信工具
-
-```bash
-python distill.py wechat login              # 扫码登录
-python distill.py wechat sync "公众号"       # 同步文章列表
-python distill.py wechat sync "公众号" --limit 50  # 限制同步数量
-python distill.py wechat download           # 下载所有待处理文章
-python distill.py wechat download --limit 10  # 限制下载数量
-python distill.py wechat status             # 查看下载状态
-```
-
 ### 内容源管理
 
 ```bash
@@ -171,7 +122,6 @@ Web UI 功能:
 - 可视化管理内容源
 - 实时查看蒸馏进度
 - 浏览生成的知识文档
-- 微信文章下载管理
 
 ## 配置文件说明
 
@@ -209,15 +159,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 问题 2: 微信登录失败
-
-```bash
-# 清除缓存重新登录
-rm -rf data/wechat_native.db
-python distill.py wechat login --qr-display text
-```
-
-### 问题 3: LLM API 调用失败
+### 问题 2: LLM API 调用失败
 
 检查 `.env` 文件中的 API Key 是否正确配置。
 
@@ -231,7 +173,7 @@ python distill.py wechat login --qr-display text
 ## 获取帮助
 
 - 查看命令帮助: `python distill.py --help`
-- 查看子命令帮助: `python distill.py wechat --help`
+- 查看子命令帮助: `python distill.py sources --help`
 - 查看项目文档: `docs/` 目录
 
 ---

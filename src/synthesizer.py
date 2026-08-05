@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import tiktoken
 import yaml
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -17,6 +16,7 @@ from .cache import CacheManager
 from .config import ConfigManager, get_config_manager
 from .llm_client import LLMClient, get_llm_client
 from .models import Article, KnowledgeDoc, PromptTemplate
+from .utils import count_tokens, format_articles_for_prompt, replace_article_refs
 
 console = Console()
 
@@ -39,12 +39,9 @@ class KnowledgeSynthesizer:
         self.cache = cache_manager or CacheManager()
         self.config_manager = config_manager or get_config_manager()
 
-        # 加载配置
         self.config = self.config_manager.load_config()
         self.prompts = self.config_manager.load_prompts()
 
-        # 主题名 -> prompt_key 映射（topics.yaml 中的主题是中文名，
-        # 直接用主题名在 prompts.yaml 里找不到对应提示词，需经 prompt_key 中转）
         try:
             self.topic_prompt_keys = {
                 t.name: t.prompt_key for t in self.config_manager.load_topics()
@@ -52,19 +49,10 @@ class KnowledgeSynthesizer:
         except Exception:
             self.topic_prompt_keys = {}
 
-        # 初始化 tokenizer
-        try:
-            self.tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo")
-        except Exception:
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
-
-        # Token 预算配置
         self.max_context = self.config.processing.max_context
         self.max_output = self.config.processing.max_output
         self.reserved_tokens = self.config.processing.reserved_tokens
         self.safety_margin = self.config.processing.safety_margin
-
-        # 文章截取长度
         self.max_article_length = self.config.processing.max_article_length
 
     def count_tokens(self, text: str) -> int:
@@ -76,19 +64,10 @@ class KnowledgeSynthesizer:
             return int(len(text) / 1.5)
 
     def create_batches(self, articles: List[Article]) -> List[List[Article]]:
-        """智能分批：根据文章长度动态分组
-
-        Args:
-            articles: 文章列表
-
-        Returns:
-            批次列表
-        """
         batches = []
         current_batch = []
         current_tokens = 0
 
-        # 计算可用的输入 token 预算
         available_tokens = int(
             (self.max_context - self.max_output - self.reserved_tokens)
             * self.safety_margin
@@ -96,11 +75,9 @@ class KnowledgeSynthesizer:
 
         for article in articles:
             content = article.content
-            # 根据配置截取文章长度（0 表示不截取）
             max_len = self.max_article_length if self.max_article_length > 0 else len(content)
-            article_tokens = self.count_tokens(content[:max_len])
+            article_tokens = count_tokens(content[:max_len])
 
-            # 检查是否需要开新批次
             if current_tokens + article_tokens > available_tokens and current_batch:
                 batches.append(current_batch)
                 current_batch = []
@@ -109,101 +86,17 @@ class KnowledgeSynthesizer:
             current_batch.append(article)
             current_tokens += article_tokens
 
-        # 添加最后一批
         if current_batch:
             batches.append(current_batch)
 
         return batches
-
-    def format_articles_for_prompt(self, articles: List[Article]) -> str:
-        """格式化文章列表用于提示词
-
-        Args:
-            articles: 文章列表
-
-        Returns:
-            格式化后的文本
-        """
-        articles_text = ""
-        for i, article in enumerate(articles, 1):
-            content = article.content
-            max_len = self.max_article_length if self.max_article_length > 0 else len(content)
-            # 在文章标题中加入编号，方便 LLM 引用
-            articles_text += f"\n\n### [文章{i}] {article.title}\n{content[:max_len]}\n"
-
-        return articles_text
-
-    def _build_article_index(self, articles: List[Article]) -> Dict[int, Article]:
-        """构建文章编号索引"""
-        return {i: article for i, article in enumerate(articles, 1)}
-
-    def _replace_article_refs(self, content: str, articles: List[Article]) -> str:
-        """将文章引用替换为带链接的 Markdown 格式
-
-        Args:
-            content: LLM 生成的内容
-            articles: 文章列表
-
-        Returns:
-            替换后的内容，引用格式为：[完整文章标题](url)
-        """
-        import re
-
-        article_index = self._build_article_index(articles)
-
-        def replace_ref(match):
-            """替换文章引用为链接"""
-            ref_text = match.group(0)
-            numbers = re.findall(r'\d+', ref_text)
-            if not numbers:
-                return ref_text
-
-            links = []
-            for num_str in numbers:
-                num = int(num_str)
-                if num in article_index:
-                    article = article_index[num]
-                    url = article.url or "#"
-                    # 使用完整标题，不截取
-                    links.append(f"[{article.title}]({url})")
-
-            if links:
-                # 如果只有一个链接，直接返回
-                if len(links) == 1:
-                    return links[0]
-                # 多个链接用有序列表格式
-                return "\n" + "\n".join(f"{i+1}. {link}" for i, link in enumerate(links))
-            return ref_text
-
-        # 匹配括号中的引用，如 (文章1)、(文章1、2)、（文章1-3）
-        pattern1 = r'[（(]文章\s*\d+(?:[、,，]\s*\d+)*\s*[）)]'
-        result = re.sub(pattern1, replace_ref, content)
-
-        # 匹配行内的引用，如 文章1、文章 1
-        pattern2 = r'文章\s*\d+(?:[、,，]\s*\d+)*(?:\s*[-–—]\s*\d+)?'
-        result = re.sub(pattern2, replace_ref, result)
-
-        # 清理多余的空括号
-        result = re.sub(r'[（(]\s*[）)]', '', result)
-
-        return result
 
     def extract_batch_insights(
         self,
         articles: List[Article],
         topic: str,
     ) -> str:
-        """从一批文章中提取核心观点
-
-        Args:
-            articles: 文章列表
-            topic: 主题名称
-
-        Returns:
-            提取的核心观点（带文章引用）
-        """
-        # 构建输入文本
-        articles_text = self.format_articles_for_prompt(articles)
+        articles_text = format_articles_for_prompt(articles, self.max_article_length)
 
         # 获取提示词：先按主题的 prompt_key 查，再按主题名查，最后回退 general
         prompt_key = self.topic_prompt_keys.get(topic)
@@ -314,8 +207,7 @@ class KnowledgeSynthesizer:
         cached_final = self.cache.load_final_doc(topic)
         if cached_final:
             console.print(f"[green]>> 使用缓存：【{topic}】已完成合成[/green]\n")
-            # 对缓存结果也进行链接替换
-            return self._replace_article_refs(cached_final, articles)
+            return replace_article_refs(cached_final, articles)
 
         console.print(f"\n[bold cyan]正在合成【{topic}】知识体系...[/bold cyan]")
         console.print(f"[yellow]共 {len(articles)} 篇文章[/yellow]\n")
@@ -377,8 +269,7 @@ class KnowledgeSynthesizer:
         console.print(f"[yellow]最终整合 {len(batch_insights)} 批结果...[/yellow]")
         final_doc = self.synthesize_batches(batch_insights, topic)
 
-        # 将文章引用替换为带链接的格式
-        final_doc_with_links = self._replace_article_refs(final_doc, articles)
+        final_doc_with_links = replace_article_refs(final_doc, articles)
 
         # 保存最终结果（保存带链接的版本）
         self.cache.save_final_doc(topic, final_doc_with_links)

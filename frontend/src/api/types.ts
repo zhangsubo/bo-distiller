@@ -146,38 +146,6 @@ export interface SyncConfigPayload {
   incremental: boolean;
 }
 
-// 微信下载
-export interface WeChatConfig {
-  enabled: boolean;
-  api_base: string;
-  api_token: string;
-  storage_dir: string;
-  formats: string[];
-  requests_per_minute: number;
-  download_on_sync: boolean;
-  write_back_content: boolean;
-  localize_images: boolean;
-}
-
-export interface WeChatStats {
-  pending: number;
-  downloading: number;
-  done: number;
-  failed: number;
-}
-
-export interface WeChatCurrent {
-  article_id: string | null;
-  title: string | null;
-  worker_alive: boolean;
-}
-
-export interface WeChatStatus {
-  stats: WeChatStats;
-  current: WeChatCurrent;
-  enabled: boolean;
-}
-
 // 提示词
 export interface PromptTemplate {
   system?: string;
