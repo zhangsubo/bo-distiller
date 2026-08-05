@@ -5,23 +5,20 @@ Cubox 同步服务
 """
 
 from datetime import datetime
-from typing import List
 
 from rich.console import Console
-
-from src.config import get_config_manager
 
 console = Console()
 
 
 def run_sync(incremental: bool = False) -> dict:
-    """执行 Cubox 同步
+    """执行 Cubox 同步（含完整正文、批注、AI 洞见）
 
     Args:
         incremental: 是否增量同步（基于上次同步时间）
 
     Returns:
-        同步结果字典（status/message/count/wechat_enqueued）
+        同步结果字典（status/message/count）
 
     Raises:
         ValueError: Cubox CLI 不可用
@@ -55,20 +52,39 @@ def run_sync(incremental: bool = False) -> dict:
     else:
         articles = adapter.fetch(source_config)
 
-    # 同步后自动入队微信文章下载（配置启用时）
-    wechat_enqueued = 0
-    try:
-        wechat_config = get_config_manager().load_config().wechat
-        if wechat_config.enabled and wechat_config.download_on_sync:
-            from src.services.wechat_queue import enqueue_wechat_articles
-            wechat_enqueued = enqueue_wechat_articles(articles)
-    except Exception as e:
-        # 入队失败不影响同步结果
-        console.print(f"[yellow]微信文章入队失败: {e}[/yellow]")
-
     return {
         "status": "ok",
-        "message": f"同步完成，获取 {len(articles)} 篇文章",
+        "message": f"同步完成，获取 {len(articles)} 篇文章（含完整正文）",
         "count": len(articles),
-        "wechat_enqueued": wechat_enqueued,
+    }
+
+
+def backfill_content(limit: int = 0) -> dict:
+    """为已有 Cubox 文章补抓完整正文
+
+    Args:
+        limit: 最多处理篇数（0=不限制）
+
+    Returns:
+        结果字典
+    """
+    from src.adapters.cubox_adapter import CuboxAdapter
+    from src.models import SourceConfig
+
+    adapter = CuboxAdapter(use_sqlite=True)
+    source_config = SourceConfig(
+        type="cubox",
+        name="Cubox 收藏",
+        identifier="cubox-cli",
+        enabled=True,
+    )
+
+    if not adapter.validate(source_config):
+        raise ValueError("Cubox CLI 不可用")
+
+    count = adapter.backfill_full_content(source_config, limit=limit)
+    return {
+        "status": "ok",
+        "message": f"补抓完成，更新 {count} 篇文章",
+        "count": count,
     }

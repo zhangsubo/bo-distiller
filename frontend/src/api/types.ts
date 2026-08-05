@@ -89,6 +89,7 @@ export interface LLMProvider {
   model: string;
   max_context: number;
   max_output: number;
+  enabled_models?: string[]; // 用户启用的模型列表
 }
 
 export interface AppConfig {
@@ -144,38 +145,6 @@ export interface SyncConfigPayload {
   enabled: boolean;
   interval_minutes: number;
   incremental: boolean;
-}
-
-// 微信下载
-export interface WeChatConfig {
-  enabled: boolean;
-  api_base: string;
-  api_token: string;
-  storage_dir: string;
-  formats: string[];
-  requests_per_minute: number;
-  download_on_sync: boolean;
-  write_back_content: boolean;
-  localize_images: boolean;
-}
-
-export interface WeChatStats {
-  pending: number;
-  downloading: number;
-  done: number;
-  failed: number;
-}
-
-export interface WeChatCurrent {
-  article_id: string | null;
-  title: string | null;
-  worker_alive: boolean;
-}
-
-export interface WeChatStatus {
-  stats: WeChatStats;
-  current: WeChatCurrent;
-  enabled: boolean;
 }
 
 // 提示词

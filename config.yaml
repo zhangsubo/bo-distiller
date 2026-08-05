@@ -66,15 +66,3 @@ topic_discovery:
   method: hybrid
   min_articles_per_topic: 3
   min_keyword_score: 1
-wechat:
-  api_base: https://down.mptext.top
-  api_token: ''
-  download_on_sync: true
-  enabled: true
-  formats:
-  - markdown
-  - html
-  localize_images: true
-  requests_per_minute: 1
-  storage_dir: ./data/wechat_articles
-  write_back_content: true

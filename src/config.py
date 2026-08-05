@@ -1,7 +1,7 @@
 """
 Bo-Distiller 配置管理模块
 
-负责加载和验证 YAML 配置文件，支持环境变量替换。
+负责加载和验证配置，支持从 SQLite 数据库存储。
 """
 
 import os
@@ -24,174 +24,120 @@ from .models import (
     TopicConfig,
     TopicDiscoveryConfig,
     PromptTemplate,
-    WeChatConfig,
 )
+from .storage import get_storage
 
 console = Console()
 
-# 加载环境变量
 load_dotenv(override=True)
+
+SETTING_KEYS = {
+    "system": "system_config",
+    "sources": "sources",
+    "prompts": "prompts",
+    "topics": "topics",
+}
 
 
 class ConfigManager:
-    """配置管理器
-
-    负责加载 config.yaml、sources.yaml、prompts.yaml 等配置文件，
-    并进行环境变量替换和 Pydantic 验证。
-    """
-
     def __init__(self, config_dir: str = "."):
         self.config_dir = Path(config_dir)
         self._config_cache: Dict[str, Any] = {}
+        self._storage = get_storage()
+
+    def _migrate_yaml_to_db(self, key: str, yaml_file: str) -> Optional[Dict]:
+        yaml_path = self.config_dir / yaml_file
+        if not yaml_path.exists():
+            return None
+        try:
+            with open(yaml_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            if data:
+                self._storage.set_setting(key, data)
+                console.print(f"[dim]>> 迁移 {yaml_file} 到数据库[/dim]")
+            return data
+        except Exception as e:
+            console.print(f"[yellow]迁移 {yaml_file} 失败: {e}[/yellow]")
+            return None
 
     def load_config(self, config_file: str = "config.yaml") -> SystemConfig:
-        """加载系统配置
-
-        Args:
-            config_file: 配置文件名
-
-        Returns:
-            验证后的系统配置对象
-
-        Raises:
-            FileNotFoundError: 配置文件不存在
-            ValueError: 配置格式错误或验证失败
-        """
-        config_path = self.config_dir / config_file
-
-        if not config_path.exists():
-            console.print(f"[yellow]警告: {config_path} 不存在，使用默认配置[/yellow]")
+        db_key = SETTING_KEYS["system"]
+        raw_config = self._storage.get_setting(db_key)
+        if raw_config is None:
+            raw_config = self._migrate_yaml_to_db(db_key, config_file)
+        if not raw_config:
             return SystemConfig()
-
         try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                raw_config = yaml.safe_load(f) or {}
-
-            if not raw_config:
-                console.print("[yellow]警告: 配置文件为空，使用默认配置[/yellow]")
-                return SystemConfig()
-
-            # 环境变量替换
             raw_config = self._substitute_env_vars(raw_config)
-
-            # 转换为 SystemConfig
             config = self._parse_system_config(raw_config)
-
-            # 验证配置完整性
             self._validate_config(config)
-
             self._config_cache["system"] = config
             return config
-
-        except yaml.YAMLError as e:
-            console.print(f"[red]YAML 格式错误: {e}[/red]")
-            console.print("[yellow]使用默认配置[/yellow]")
-            return SystemConfig()
-        except ValueError as e:
-            console.print(f"[red]配置验证失败: {e}[/red]")
-            console.print("[yellow]使用默认配置[/yellow]")
-            return SystemConfig()
         except Exception as e:
-            console.print(f"[red]加载配置失败: {e}[/red]")
-            console.print("[yellow]使用默认配置[/yellow]")
+            console.print(f"[red]配置加载失败: {e}[/red]")
             return SystemConfig()
+
+    def save_config(self, config: Dict) -> None:
+        self._storage.set_setting(SETTING_KEYS["system"], config)
+        self._config_cache.pop("system", None)
 
     def load_sources(self, sources_file: str = "sources.yaml") -> List[SourceConfig]:
-        """加载内容源配置
-
-        Args:
-            sources_file: 源配置文件名
-
-        Returns:
-            内容源配置列表
-        """
-        sources_path = self.config_dir / sources_file
-
-        if not sources_path.exists():
-            console.print(f"[yellow]警告: {sources_path} 不存在[/yellow]")
+        db_key = SETTING_KEYS["sources"]
+        raw_sources = self._storage.get_setting(db_key)
+        if raw_sources is None:
+            raw_sources = self._migrate_yaml_to_db(db_key, sources_file)
+        if not raw_sources:
             return []
-
         try:
-            with open(sources_path, "r", encoding="utf-8") as f:
-                raw_sources = yaml.safe_load(f) or {}
-
             sources_list = raw_sources.get("sources", [])
             sources = []
-
             for source_data in sources_list:
-                # 环境变量替换
                 source_data = self._substitute_env_vars(source_data)
                 source = SourceConfig(**source_data)
                 sources.append(source)
-
             self._config_cache["sources"] = sources
             return sources
-
-        except yaml.YAMLError as e:
-            console.print(f"[red]YAML 格式错误: {e}[/red]")
-            return []
         except Exception as e:
             console.print(f"[red]加载源配置失败: {e}[/red]")
             return []
 
+    def save_sources(self, sources: List[Dict]) -> None:
+        self._storage.set_setting(SETTING_KEYS["sources"], {"sources": sources})
+        self._config_cache.pop("sources", None)
+
     def load_prompts(self, prompts_file: str = "prompts.yaml") -> Dict[str, PromptTemplate]:
-        """加载提示词配置
-
-        Args:
-            prompts_file: 提示词配置文件名
-
-        Returns:
-            提示词模板字典
-        """
-        prompts_path = self.config_dir / prompts_file
-
-        if not prompts_path.exists():
-            console.print(f"[yellow]警告: {prompts_path} 不存在，使用默认提示词[/yellow]")
+        db_key = SETTING_KEYS["prompts"]
+        raw_prompts = self._storage.get_setting(db_key)
+        if raw_prompts is None:
+            raw_prompts = self._migrate_yaml_to_db(db_key, prompts_file)
+        if not raw_prompts:
             return self._get_default_prompts()
-
         try:
-            with open(prompts_path, "r", encoding="utf-8") as f:
-                raw_prompts = yaml.safe_load(f) or {}
-
             prompts = {}
             for key, value in raw_prompts.items():
                 if key == "settings":
                     continue
                 if isinstance(value, dict) and "system" in value:
                     prompts[key] = PromptTemplate(**value)
-
             self._config_cache["prompts"] = prompts
             return prompts
-
-        except yaml.YAMLError as e:
-            console.print(f"[red]YAML 格式错误: {e}[/red]")
-            return self._get_default_prompts()
         except Exception as e:
-            console.print(f"[yellow]警告: 加载提示词失败 ({e})，使用默认提示词[/yellow]")
+            console.print(f"[yellow]加载提示词失败 ({e})，使用默认提示词[/yellow]")
             return self._get_default_prompts()
+
+    def save_prompts(self, prompts: Dict) -> None:
+        self._storage.set_setting(SETTING_KEYS["prompts"], prompts)
+        self._config_cache.pop("prompts", None)
 
     def load_topics(self, topics_file: str = "topics.yaml") -> List[TopicConfig]:
-        """加载主题配置
-
-        Args:
-            topics_file: 主题配置文件名
-
-        Returns:
-            主题配置列表
-        """
-        topics_path = self.config_dir / topics_file
-
-        if not topics_path.exists():
-            console.print(f"[yellow]警告: {topics_path} 不存在[/yellow]")
+        db_key = SETTING_KEYS["topics"]
+        raw_topics = self._storage.get_setting(db_key)
+        if raw_topics is None:
+            raw_topics = self._migrate_yaml_to_db(db_key, topics_file)
+        if not raw_topics:
             return []
-
         try:
-            with open(topics_path, "r", encoding="utf-8") as f:
-                raw_topics = yaml.safe_load(f) or {}
-
             topics = []
-
-            # 支持 predefined_topics 格式（键值对形式）
             predefined = raw_topics.get("predefined_topics", {})
             if predefined and isinstance(predefined, dict):
                 for name, topic_data in predefined.items():
@@ -204,24 +150,21 @@ class ConfigManager:
                             discovery_method=topic_data.get("discovery_method", "hybrid"),
                         )
                         topics.append(topic)
-
-            # 兼容 topics 列表格式
             topics_list = raw_topics.get("topics", [])
             if topics_list and isinstance(topics_list, list):
                 for topic_data in topics_list:
                     if isinstance(topic_data, dict):
                         topic = TopicConfig(**topic_data)
                         topics.append(topic)
-
             self._config_cache["topics"] = topics
             return topics
-
-        except yaml.YAMLError as e:
-            console.print(f"[red]YAML 格式错误: {e}[/red]")
-            return []
         except Exception as e:
             console.print(f"[red]加载主题配置失败: {e}[/red]")
             return []
+
+    def save_topics(self, topics: Dict) -> None:
+        self._storage.set_setting(SETTING_KEYS["topics"], topics)
+        self._config_cache.pop("topics", None)
 
     def _parse_system_config(self, raw_config: Dict[str, Any]) -> SystemConfig:
         """解析系统配置"""
@@ -232,7 +175,6 @@ class ConfigManager:
         topic_raw = raw_config.get("topic_discovery", {})
         output_raw = raw_config.get("output", {})
         sync_raw = raw_config.get("sync", {})
-        wechat_raw = raw_config.get("wechat", {})
 
         # 解析 LLM 配置
         providers = {}
@@ -260,9 +202,8 @@ class ConfigManager:
             include_sources=output_raw.get("local", {}).get("include_sources", True),
         ) if output_raw else OutputConfig()
 
-        # 解析定时同步与微信下载配置
+        # 解析定时同步配置
         sync_config = SyncConfig(**sync_raw) if sync_raw else SyncConfig()
-        wechat_config = WeChatConfig(**wechat_raw) if wechat_raw else WeChatConfig()
 
         return SystemConfig(
             project_name=project.get("name", "bo-distiller"),
@@ -273,7 +214,6 @@ class ConfigManager:
             topic_discovery=topic_config,
             output=output_config,
             sync=sync_config,
-            wechat=wechat_config,
         )
 
     def _substitute_env_vars(self, config: Any) -> Any:

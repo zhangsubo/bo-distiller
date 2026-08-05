@@ -1,23 +1,11 @@
-"""
-Web 服务共享工具
-
-从 web_ui.py 平移而来的公共辅助函数
-"""
-
-from pathlib import Path
+from src.storage import get_storage
 
 
 def _get_storage():
-    """延迟导入 SQLiteStorage"""
-    import sys
-    # 项目根目录（src/web/deps.py 向上三级）
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from src.storage import get_storage
     return get_storage()
 
 
 def _article_to_dict(article) -> dict:
-    """Article 对象转 dict"""
     return {
         "id": article.id,
         "title": article.title,

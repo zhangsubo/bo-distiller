@@ -6,7 +6,6 @@ Bo-Distiller 缓存管理模块
 
 import hashlib
 import json
-import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -40,9 +39,9 @@ class CacheManager:
             self._storage = get_storage()
 
         # 缓存文件路径（pickle 备用）
-        self.articles_cache = self.cache_dir / "articles.pkl"
-        self.cleaned_cache = self.cache_dir / "cleaned.pkl"
-        self.topics_cache = self.cache_dir / "topics.pkl"
+        self.articles_cache = self.cache_dir / "articles.json"
+        self.cleaned_cache = self.cache_dir / "cleaned.json"
+        self.topics_cache = self.cache_dir / "topics.json"
         self.batches_dir = self.cache_dir / "batches"
         self.batches_dir.mkdir(parents=True, exist_ok=True)
         self.final_dir = self.cache_dir / "final"
@@ -59,17 +58,17 @@ class CacheManager:
     # ==================== 原始内容缓存 ====================
 
     def save_articles(self, articles: List[Article]) -> None:
-        """保存原始文章"""
         if self.use_sqlite and self._storage:
             saved = self._storage.save_articles(articles)
             console.print(f"[dim]>> SQLite：保存 {saved} 篇原始文章[/dim]")
         else:
-            with open(self.articles_cache, "wb") as f:
-                pickle.dump(articles, f)
+            data = [a.model_dump(mode="json") for a in articles]
+            self.articles_cache.write_text(
+                json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8"
+            )
             console.print(f"[dim]>> 缓存：保存 {len(articles)} 篇原始文章[/dim]")
 
     def load_articles(self) -> Optional[List[Article]]:
-        """加载原始文章"""
         if self.use_sqlite and self._storage:
             articles = self._storage.get_all_articles()
             if articles:
@@ -78,8 +77,8 @@ class CacheManager:
             return None
 
         if self.articles_cache.exists():
-            with open(self.articles_cache, "rb") as f:
-                articles = pickle.load(f)
+            data = json.loads(self.articles_cache.read_text(encoding="utf-8"))
+            articles = [Article(**item) for item in data]
             console.print(f"[yellow]>> 缓存：读取 {len(articles)} 篇原始文章[/yellow]")
             return articles
         return None
@@ -87,16 +86,16 @@ class CacheManager:
     # ==================== 清洗结果缓存 ====================
 
     def save_cleaned(self, cleaned: List[Article]) -> None:
-        """保存清洗后的文章"""
-        with open(self.cleaned_cache, "wb") as f:
-            pickle.dump(cleaned, f)
+        data = [a.model_dump(mode="json") for a in cleaned]
+        self.cleaned_cache.write_text(
+            json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8"
+        )
         console.print(f"[dim]>> 缓存：保存 {len(cleaned)} 篇清洗后文章[/dim]")
 
     def load_cleaned(self) -> Optional[List[Article]]:
-        """加载清洗后的文章"""
         if self.cleaned_cache.exists():
-            with open(self.cleaned_cache, "rb") as f:
-                cleaned = pickle.load(f)
+            data = json.loads(self.cleaned_cache.read_text(encoding="utf-8"))
+            cleaned = [Article(**item) for item in data]
             console.print(f"[yellow]>> 缓存：读取 {len(cleaned)} 篇清洗后文章[/yellow]")
             return cleaned
         return None
@@ -104,17 +103,17 @@ class CacheManager:
     # ==================== 主题分类缓存 ====================
 
     def save_topics(self, topics: Dict[str, List[Article]]) -> None:
-        """保存主题分类结果"""
-        with open(self.topics_cache, "wb") as f:
-            pickle.dump(topics, f)
+        data = {k: [a.model_dump(mode="json") for a in v] for k, v in topics.items()}
+        self.topics_cache.write_text(
+            json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8"
+        )
         total = sum(len(v) for v in topics.values())
         console.print(f"[dim]>> 缓存：保存主题分类结果（{total}篇）[/dim]")
 
     def load_topics(self) -> Optional[Dict[str, List[Article]]]:
-        """加载主题分类结果"""
         if self.topics_cache.exists():
-            with open(self.topics_cache, "rb") as f:
-                topics = pickle.load(f)
+            data = json.loads(self.topics_cache.read_text(encoding="utf-8"))
+            topics = {k: [Article(**item) for item in v] for k, v in data.items()}
             total = sum(len(v) for v in topics.values())
             console.print(f"[yellow]>> 缓存：读取主题分类结果（{total}篇）[/yellow]")
             return topics

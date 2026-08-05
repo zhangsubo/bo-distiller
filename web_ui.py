@@ -12,6 +12,15 @@ from src.web.app import create_app
 
 app = create_app()
 
+# 调试：列出所有路由
+print("\n[DEBUG] 应用中的所有 API 路由:")
+from fastapi.openapi.utils import get_openapi
+schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+paths = [p for p in schema.get('paths', {}).keys() if p.startswith('/api')]
+for path in sorted(paths):
+    print(f"  {path}")
+print(f"[DEBUG] 总计 {len(paths)} 个 API 路由\n")
+
 
 if __name__ == "__main__":
     print("\n" + "=" * 50)

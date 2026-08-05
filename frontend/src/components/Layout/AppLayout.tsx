@@ -2,10 +2,10 @@ import React from 'react';
 import { Layout, Menu } from 'antd';
 import {
   DatabaseOutlined,
+  ImportOutlined,
   SettingOutlined,
   ThunderboltOutlined,
   BookOutlined,
-  WechatOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAppStore } from '../../stores/appStore';
@@ -13,12 +13,20 @@ import { useAppStore } from '../../stores/appStore';
 const { Sider, Content, Header } = Layout;
 
 const menuItems = [
-  { key: '/articles', icon: <DatabaseOutlined />, label: 'Cubox 内容' },
-  { key: '/wechat', icon: <WechatOutlined />, label: '微信下载' },
+  {
+    key: 'input',
+    icon: <ImportOutlined />,
+    label: '输入采集',
+    children: [
+      { key: '/articles', label: 'Cubox' },
+    ],
+  },
   { key: '/distill', icon: <ThunderboltOutlined />, label: '蒸馏进度' },
   { key: '/knowledge', icon: <BookOutlined />, label: '知识库' },
   { key: '/settings', icon: <SettingOutlined />, label: '设置' },
 ];
+
+const allLeafKeys = ['/articles', '/distill', '/knowledge', '/settings'];
 
 const AppLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -26,10 +34,11 @@ const AppLayout: React.FC = () => {
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
 
-  // 匹配当前路由的菜单 key
-  const selectedKey = menuItems.find((item) =>
-    location.pathname.startsWith(item.key),
-  )?.key || '/articles';
+  const selectedKey = allLeafKeys.find((key) =>
+    location.pathname.startsWith(key),
+  ) || '/articles';
+
+  const openKeys = location.pathname.startsWith('/articles') ? ['input'] : [];
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -60,8 +69,13 @@ const AppLayout: React.FC = () => {
           theme="dark"
           mode="inline"
           selectedKeys={[selectedKey]}
+          defaultOpenKeys={openKeys}
           items={menuItems}
-          onClick={({ key }) => navigate(key)}
+          onClick={({ key }) => {
+            if (allLeafKeys.includes(key)) {
+              navigate(key);
+            }
+          }}
         />
       </Sider>
       <Layout>

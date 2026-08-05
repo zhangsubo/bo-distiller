@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from rich.console import Console
+from rich.progress import Progress
 
 from ..models import Article, SourceConfig, SourceInfo, SourceType
 from ..storage import SQLiteStorage, get_storage
@@ -30,6 +31,21 @@ class CuboxAdapter(SourceAdapter):
             self._storage = get_storage()
         self.state_file = Path(".cache/cubox_state.json")
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
+
+    def fetch_card_detail(self, card_id: str) -> Optional[dict]:
+        """获取单篇卡片完整详情（含正文、批注、AI 洞见）"""
+        try:
+            result = subprocess.run(
+                ["cubox-cli", "card", "detail", "--id", str(card_id), "-o", "json"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                return None
+            return json.loads(result.stdout)
+        except Exception:
+            return None
 
     def validate(self, source_config: SourceConfig) -> bool:
         """验证 Cubox CLI 是否可用"""
@@ -54,8 +70,8 @@ class CuboxAdapter(SourceAdapter):
             return False
 
     def fetch(self, source_config: SourceConfig) -> List[Article]:
-        """全量抓取 Cubox 收藏"""
-        console.print("[cyan]正在从 Cubox 全量抓取...[/cyan]")
+        """全量抓取 Cubox 收藏（含完整正文、批注、AI 洞见）"""
+        console.print("[cyan]正在从 Cubox 全量抓取（含完整正文）...[/cyan]")
 
         # 调用 Cubox CLI 导出所有收藏
         try:
@@ -80,16 +96,24 @@ class CuboxAdapter(SourceAdapter):
             raise Exception(f"Cubox CLI 输出解析失败: {e}")
 
         articles = []
-        for item in cubox_items:
-            article = self._parse_cubox_item(item, source_config)
-            if article:
-                articles.append(article)
+        with Progress() as progress:
+            task = progress.add_task("[cyan]抓取完整正文...", total=len(cubox_items))
+            for item in cubox_items:
+                detail = self.fetch_card_detail(item.get("id", ""))
+                article = self._parse_cubox_item(item, source_config, detail=detail)
+                if article:
+                    articles.append(article)
+                progress.advance(task)
 
         # 保存到 SQLite
         if self.use_sqlite and self._storage and articles:
             saved = self._storage.save_articles(articles)
             dupes = self._storage.mark_url_duplicates()
             console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 文章，标记 {dupes} 条重复 URL[/dim]")
+
+        # 补抓空标签文章的标签（Cubox 通常在次日自动补标签）
+        if self.use_sqlite and self._storage:
+            self._refresh_empty_tags(source_config)
 
         # 保存状态（最新文章的时间戳）
         if articles:
@@ -108,7 +132,7 @@ class CuboxAdapter(SourceAdapter):
     def fetch_incremental(
         self, source_config: SourceConfig, since: float = 0
     ) -> List[Article]:
-        """增量抓取 Cubox（基于 since 时间）"""
+        """增量抓取 Cubox（基于 since 时间，含完整正文）"""
         since_dt = datetime.fromtimestamp(since) if since else None
         if since_dt:
             console.print(
@@ -151,16 +175,24 @@ class CuboxAdapter(SourceAdapter):
             raise Exception(f"Cubox CLI 输出解析失败: {e}")
 
         articles = []
-        for item in cubox_items:
-            article = self._parse_cubox_item(item, source_config)
-            if article:
-                articles.append(article)
+        with Progress() as progress:
+            task = progress.add_task("[cyan]增量抓取完整正文...", total=len(cubox_items))
+            for item in cubox_items:
+                detail = self.fetch_card_detail(item.get("id", ""))
+                article = self._parse_cubox_item(item, source_config, detail=detail)
+                if article:
+                    articles.append(article)
+                progress.advance(task)
 
         # 保存到 SQLite
         if self.use_sqlite and self._storage and articles:
             saved = self._storage.save_articles(articles)
             dupes = self._storage.mark_url_duplicates()
             console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 增量文章，标记 {dupes} 条重复 URL[/dim]")
+
+        # 补抓空标签
+        if self.use_sqlite and self._storage:
+            self._refresh_empty_tags(source_config)
 
         # 更新状态
         if articles:
@@ -173,9 +205,15 @@ class CuboxAdapter(SourceAdapter):
         return articles
 
     def _parse_cubox_item(
-        self, item: dict, config: SourceConfig
+        self, item: dict, config: SourceConfig, detail: Optional[dict] = None
     ) -> Optional[Article]:
-        """解析 Cubox 单条收藏"""
+        """解析 Cubox 单条收藏
+
+        Args:
+            item: card list 返回的基础数据
+            config: 源配置
+            detail: card detail 返回的完整数据（含正文、批注、AI 洞见）
+        """
         try:
             # 生成唯一 ID（使用 Cubox 的 ID）
             article_id = item.get("id", "")
@@ -191,28 +229,59 @@ class CuboxAdapter(SourceAdapter):
             folder_info = item.get("folder", {})
             folder_name = folder_info.get("name", "") if isinstance(folder_info, dict) else ""
 
+            # 基础 metadata
+            metadata = {
+                "cubox_id": item.get("id"),
+                "domain": item.get("domain", ""),
+                "tags": item.get("tags", []),
+                "folder": folder_name,
+                "starred": item.get("starred", False),
+                "read": item.get("read", False),
+                "article_title": item.get("article_title", ""),
+                "description": item.get("description", ""),
+            }
+
+            # 默认值：无 detail 时用 list 数据
+            content = item.get("description", "") or item.get("article_title", "")
+            author = item.get("domain")
+
+            if detail:
+                # 有完整详情：覆盖 content 和 author
+                full_content = detail.get("content", "")
+                if full_content:
+                    content = full_content
+                author = detail.get("author") or item.get("domain")
+
+                # 存储批注
+                annotations = detail.get("annotations", [])
+                if annotations:
+                    metadata["annotations"] = annotations
+
+                # 存储 AI 洞见（摘要 + Q&A）
+                insight = detail.get("insight")
+                if insight:
+                    metadata["insight"] = {
+                        "summary": insight.get("summary", ""),
+                        "qas": insight.get("qas", []),
+                    }
+                metadata["has_full_content"] = True
+            else:
+                metadata["has_full_content"] = False
+
             return Article(
                 id=article_id,
                 title=item.get("title", "无标题"),
-                content=item.get("description", "") or item.get("article_title", ""),
+                content=content,
                 url=item.get("url"),
                 source=SourceInfo(
                     type=SourceType.CUBOX,
                     name=config.name,
                     identifier=config.identifier,
                 ),
-                author=item.get("domain"),
+                author=author,
                 published_date=published_date,
                 fetched_date=fetched_date,
-                metadata={
-                    "cubox_id": item.get("id"),
-                    "domain": item.get("domain", ""),
-                    "tags": item.get("tags", []),
-                    "folder": folder_name,
-                    "starred": item.get("starred", False),
-                    "read": item.get("read", False),
-                    "article_title": item.get("article_title", ""),
-                },
+                metadata=metadata,
             )
         except Exception as e:
             console.print(f"[yellow]解析 Cubox 项失败: {e}[/yellow]")
@@ -261,3 +330,143 @@ class CuboxAdapter(SourceAdapter):
             "last_sync": state.get("last_sync"),
             "total_articles": state.get("total_articles", 0),
         }
+
+    def _refresh_empty_tags(self, source_config: SourceConfig) -> int:
+        """补抓空标签文章的标签
+
+        Cubox 通常在收藏次日才自动打标签，每次同步时检查已有文章中
+        标签为空的条目，重新拉取 detail，如果标签已更新则写回数据库。
+        """
+        if not self.use_sqlite or not self._storage:
+            return 0
+
+        articles = self._storage.get_articles_by_source("cubox", source_config.name)
+        need_refresh = []
+        for a in articles:
+            tags = (a.metadata or {}).get("tags", [])
+            if not tags:
+                need_refresh.append(a)
+
+        if not need_refresh:
+            return 0
+
+        console.print(f"[dim]>> 检查 {len(need_refresh)} 篇空标签文章是否已更新标签...[/dim]")
+        updated = 0
+
+        for article in need_refresh:
+            cubox_id = (article.metadata or {}).get("cubox_id", article.id)
+            detail = self.fetch_card_detail(cubox_id)
+            if not detail:
+                continue
+
+            new_tags = detail.get("tags", [])
+            if not new_tags:
+                continue
+
+            # 标签已更新，写回
+            meta = article.metadata or {}
+            meta["tags"] = new_tags
+
+            # 同时更新可能缺失的 insight 和 annotations
+            if not meta.get("insight") and detail.get("insight"):
+                insight = detail["insight"]
+                meta["insight"] = {
+                    "summary": insight.get("summary", ""),
+                    "qas": insight.get("qas", []),
+                }
+            if not meta.get("annotations") and detail.get("annotations"):
+                meta["annotations"] = detail["annotations"]
+
+            updated_article = Article(
+                id=article.id,
+                title=article.title,
+                content=detail.get("content") or article.content,
+                url=article.url,
+                source=article.source,
+                author=detail.get("author") or article.author,
+                published_date=article.published_date,
+                fetched_date=article.fetched_date,
+                metadata=meta,
+            )
+            self._storage.save_article(updated_article)
+            updated += 1
+
+        if updated:
+            console.print(f"[green]>> 标签补全：{updated} 篇文章获得新标签[/green]")
+        return updated
+
+    def backfill_full_content(self, source_config: SourceConfig, limit: int = 0) -> int:
+        """为已有文章补抓完整正文、批注和 AI 洞见
+
+        只处理 metadata 中 has_full_content != True 的文章。
+
+        Args:
+            source_config: 源配置
+            limit: 最多处理篇数（0=不限制）
+
+        Returns:
+            成功补抓的篇数
+        """
+        if not self.use_sqlite or not self._storage:
+            console.print("[red]backfill 需要 SQLite 存储[/red]")
+            return 0
+
+        # 找出缺少完整内容的 Cubox 文章
+        articles = self._storage.get_articles_by_source("cubox", source_config.name)
+        need_backfill = []
+        for a in articles:
+            meta = a.metadata or {}
+            if not meta.get("has_full_content"):
+                need_backfill.append(a)
+
+        if not need_backfill:
+            console.print("[green]所有文章已有完整内容[/green]")
+            return 0
+
+        if limit > 0:
+            need_backfill = need_backfill[:limit]
+
+        console.print(f"[cyan]需要补抓 {len(need_backfill)} 篇文章的完整内容[/cyan]")
+        success = 0
+
+        with Progress() as progress:
+            task = progress.add_task("[cyan]补抓完整正文...", total=len(need_backfill))
+            for article in need_backfill:
+                cubox_id = (article.metadata or {}).get("cubox_id", article.id)
+                detail = self.fetch_card_detail(cubox_id)
+                if detail:
+                    # 更新 content、author、metadata
+                    full_content = detail.get("content", "")
+                    real_author = detail.get("author") or article.author
+                    meta = article.metadata or {}
+                    meta["has_full_content"] = True
+                    meta["description"] = meta.get("description") or article.content[:200]
+
+                    annotations = detail.get("annotations", [])
+                    if annotations:
+                        meta["annotations"] = annotations
+
+                    insight = detail.get("insight")
+                    if insight:
+                        meta["insight"] = {
+                            "summary": insight.get("summary", ""),
+                            "qas": insight.get("qas", []),
+                        }
+
+                    updated = Article(
+                        id=article.id,
+                        title=article.title,
+                        content=full_content or article.content,
+                        url=article.url,
+                        source=article.source,
+                        author=real_author,
+                        published_date=article.published_date,
+                        fetched_date=article.fetched_date,
+                        metadata=meta,
+                    )
+                    self._storage.save_article(updated)
+                    success += 1
+                progress.advance(task)
+
+        console.print(f"[green]✓ 补抓完成：{success}/{len(need_backfill)} 篇[/green]")
+        return success

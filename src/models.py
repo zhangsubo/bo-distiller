@@ -149,19 +149,6 @@ class SyncConfig(BaseModel):
     incremental: bool = Field(True, description="是否增量同步")
 
 
-class WeChatConfig(BaseModel):
-    """微信文章下载配置"""
-    enabled: bool = Field(False, description="是否启用微信文章下载")
-    api_base: str = Field("https://down.mptext.top", description="下载 API 地址")
-    api_token: str = Field("", description="API Token（会员限速更高，可为空）")
-    storage_dir: str = Field("./data/wechat_articles", description="文章存储目录")
-    formats: List[str] = Field(default_factory=lambda: ["markdown", "html"], description="下载格式")
-    requests_per_minute: int = Field(1, ge=1, description="API 限速（次/分钟）")
-    download_on_sync: bool = Field(True, description="同步后自动入队微信文章")
-    write_back_content: bool = Field(True, description="下载后回写正文到数据库")
-    localize_images: bool = Field(True, description="图片本地化")
-
-
 class SystemConfig(BaseModel):
     """系统总配置"""
     project_name: str = Field("bo-distiller", description="项目名称")
@@ -172,7 +159,6 @@ class SystemConfig(BaseModel):
     topic_discovery: TopicDiscoveryConfig = Field(default_factory=TopicDiscoveryConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     sync: SyncConfig = Field(default_factory=SyncConfig)
-    wechat: WeChatConfig = Field(default_factory=WeChatConfig)
 
 
 class KnowledgeDoc(BaseModel):

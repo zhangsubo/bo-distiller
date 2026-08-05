@@ -24,9 +24,17 @@ from src.web.routers import (
     sync,
     system,
     topics,
-    wechat,
-    wechat_native,
 )
+
+# 单独导入 llm 模块以便调试
+try:
+    from src.web.routers import llm
+    print(f"[DEBUG] LLM 模块导入成功，路由数: {len(llm.router.routes)}")
+except Exception as e:
+    print(f"[ERROR] LLM 模块导入失败: {e}")
+    import traceback
+    traceback.print_exc()
+    llm = None
 
 
 @asynccontextmanager
@@ -38,15 +46,6 @@ async def lifespan(app: FastAPI):
     # 定时同步调度器（enabled=false 时也启动，便于动态开启）
     try:
         start_scheduler()
-    except Exception:
-        traceback.print_exc()
-
-    # 微信下载 worker（含崩溃恢复，不做自动扫描入队）
-    try:
-        if get_config_manager().load_config().wechat.enabled:
-            from src.services.wechat_queue import start_worker
-
-            start_worker()
     except Exception:
         traceback.print_exc()
 
@@ -81,9 +80,15 @@ def create_app() -> FastAPI:
     app.include_router(distill.router)
     app.include_router(system.router)
     app.include_router(sync.router)
-    app.include_router(wechat.router)
-    app.include_router(wechat_native.router)
     app.include_router(prompts.router)
+
+    # LLM 元数据管理
+    if llm is not None:
+        print(f"[DEBUG] 注册 LLM 路由...")
+        app.include_router(llm.router)
+        print(f"[DEBUG] LLM 路由已注册")
+    else:
+        print(f"[WARNING] LLM 模块未导入，跳过路由注册")
 
     # ==================== 前端静态文件托管 ====================
 
