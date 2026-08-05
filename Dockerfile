@@ -42,6 +42,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制项目源码
 COPY distill.py web_ui.py config.example.yaml sources.example.yaml prompts.example.yaml topics.yaml ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
 # 复制前端构建产物
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist

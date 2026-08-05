@@ -95,6 +95,13 @@ class SQLiteStorage:
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_docs_topic ON knowledge_docs(topic);
+
+                -- 设置表（JSON 存储各类配置）
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,  -- JSON
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
             """)
             columns = {row[1] for row in conn.execute("PRAGMA table_info(articles)").fetchall()}
             if "url_duplicate" not in columns:
@@ -356,6 +363,37 @@ class SQLiteStorage:
                     "SELECT * FROM knowledge_docs ORDER BY created_at DESC"
                 ).fetchall()
             return [dict(row) for row in rows]
+
+    # ==================== 设置操作 ====================
+
+    def get_setting(self, key: str) -> Optional[Dict]:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ?", (key,)
+            ).fetchone()
+            if row:
+                return json.loads(row['value'])
+        return None
+
+    def set_setting(self, key: str, value: Dict) -> None:
+        with self._get_conn() as conn:
+            conn.execute("""
+                INSERT INTO settings (key, value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (key, json.dumps(value, ensure_ascii=False)))
+
+    def delete_setting(self, key: str) -> bool:
+        with self._get_conn() as conn:
+            cursor = conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+            return cursor.rowcount > 0
+
+    def get_all_settings(self) -> Dict[str, Dict]:
+        with self._get_conn() as conn:
+            rows = conn.execute("SELECT key, value FROM settings").fetchall()
+            return {row['key']: json.loads(row['value']) for row in rows}
 
     # ==================== 统计 ====================
 
