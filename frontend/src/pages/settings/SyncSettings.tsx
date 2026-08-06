@@ -94,7 +94,9 @@ const SyncSettings: React.FC = () => {
   if (isLoading) return <Spin />;
 
   const isSyncing = syncNowMutation.isPending || syncStatus?.running;
-  const progress = syncStatus?.total > 0 ? Math.round((syncStatus.processed / syncStatus.total) * 100) : 0;
+  const total = syncStatus?.total ?? 0;
+  const processed = syncStatus?.processed ?? 0;
+  const progress = total > 0 ? Math.round((processed / total) * 100) : 0;
 
   return (
     <div>

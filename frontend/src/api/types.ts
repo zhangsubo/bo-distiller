@@ -80,6 +80,7 @@ export interface DistillStatus {
     final_count: number;
   };
   topics_done: string[];
+  incremental?: boolean;
 }
 
 // 配置
@@ -111,6 +112,7 @@ export interface AppConfig {
     batch_temperature: number;
     synthesis_temperature: number;
     max_article_length: number;
+    max_concurrent?: number;
   };
   topic_discovery: {
     method: string;
