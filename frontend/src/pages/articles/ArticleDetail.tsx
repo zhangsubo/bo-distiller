@@ -103,7 +103,14 @@ const ArticleDetail: React.FC = () => {
       {/* 文章正文 */}
       <Card size="small" title="正文" style={{ marginBottom: 20 }}>
         <div className="markdown-body" style={{ lineHeight: 1.9, fontSize: 15 }}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ({ node, ...props }) => (
+                <a {...props} target="_blank" rel="noopener noreferrer" />
+              ),
+            }}
+          >
             {article.content || '（无内容）'}
           </ReactMarkdown>
         </div>

@@ -13,6 +13,10 @@ const DistillControls: React.FC = () => {
 
   const running = data?.data?.running ?? false;
 
+  // 当任务运行时，使用后端返回的实际模型和模式
+  const displayModel = running && data?.data?.model ? data.data.model : model;
+  const displayIncremental = running && data?.data?.incremental !== undefined ? data.data.incremental : incremental;
+
   const handleStart = async () => {
     try {
       await startMutation.mutateAsync({ model, incremental });
@@ -36,7 +40,7 @@ const DistillControls: React.FC = () => {
       <Space wrap>
         <span>模型：</span>
         <Select
-          value={model}
+          value={displayModel}
           onChange={setModel}
           style={{ width: 150 }}
           disabled={running}
@@ -44,7 +48,7 @@ const DistillControls: React.FC = () => {
         />
         <span>模式：</span>
         <Radio.Group
-          value={incremental}
+          value={displayIncremental}
           onChange={(e) => setIncremental(e.target.value)}
           disabled={running}
         >

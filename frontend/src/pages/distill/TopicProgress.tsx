@@ -20,15 +20,35 @@ const TopicProgress: React.FC = () => {
     'AI应用', '自媒体', '其他',
   ];
 
+  // 假设每个主题平均需要 42/13 ≈ 3.2 个批次
+  const estimatedBatchesPerTopic = 42 / topics.length;
+
   return (
     <Card title="主题进度" size="small">
       {topics.length === 0 ? (
         <Empty description="暂无进度" />
       ) : (
         <Row gutter={[16, 12]}>
-          {topics.map((topic) => {
+          {topics.map((topic, index) => {
             const done = topicsDone.includes(topic);
-            const percent = done ? 100 : (status.running ? 50 : 0);
+            // 根据批次数估算当前主题的进度
+            // 假设按顺序处理，当前正在处理的主题索引
+            const currentTopicIndex = Math.floor(totalBatches / estimatedBatchesPerTopic);
+            let percent = 0;
+
+            if (done) {
+              percent = 100;
+            } else if (status.running && index < currentTopicIndex) {
+              // 应该已完成但还没有 final 文件
+              percent = 95;
+            } else if (status.running && index === currentTopicIndex) {
+              // 当前正在处理的主题
+              const batchesInTopic = totalBatches - (index * estimatedBatchesPerTopic);
+              percent = Math.min(90, Math.floor((batchesInTopic / estimatedBatchesPerTopic) * 100));
+            } else {
+              percent = 0;
+            }
+
             return (
               <Col key={topic} span={8}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

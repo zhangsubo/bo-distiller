@@ -62,6 +62,16 @@ class DistillTask:
         if len(self.logs) > 1000:  # 限制日志条数
             self.logs = self.logs[-1000:]
 
+        # 根据日志内容更新当前步骤
+        if "步骤 1/4" in message or "从数据库加载" in message:
+            self.current_step = "fetch"
+        elif "步骤 2/4" in message or "清洗文章" in message:
+            self.current_step = "clean"
+        elif "步骤 3/4" in message or "主题分类" in message:
+            self.current_step = "classify"
+        elif "步骤 4/4" in message or "知识合成" in message:
+            self.current_step = "synthesize"
+
     async def run(self):
         """运行任务"""
         if self.status == TaskStatus.RUNNING:
@@ -107,10 +117,21 @@ class DistillTask:
             class LogCapture:
                 def __init__(self, task):
                     self.task = task
+                    # 定义需要过滤掉的日志关键词
+                    self.filter_keywords = [
+                        "使用缓存:",
+                        "已缓存",
+                        "INFO:",
+                        "127.0.0.1:",
+                        "HTTP/1.1",
+                    ]
 
                 def write(self, text):
                     if text and text.strip():
-                        self.task.add_log(text.strip())
+                        # 过滤掉非蒸馏相关的日志
+                        stripped = text.strip()
+                        if not any(keyword in stripped for keyword in self.filter_keywords):
+                            self.task.add_log(stripped)
 
                 def flush(self):
                     pass
@@ -145,21 +166,14 @@ class DistillTask:
         # 从缓存推断进度
         topics_done = []
         if (cache_dir / "final").exists():
-            topics_done = [f.stem for f in (cache_dir / "final").glob("*.txt")]
+            # 移除文件名中的 _final 后缀
+            topics_done = [
+                f.stem.replace("_final", "")
+                for f in (cache_dir / "final").glob("*.txt")
+            ]
 
-        # 推断当前步骤
-        step = self.current_step
-        if self.status == TaskStatus.RUNNING:
-            if (cache_dir / "final").exists() and topics_done:
-                step = "synthesize"
-            elif (cache_dir / "topics.pkl").exists():
-                step = "classify"
-            elif (cache_dir / "cleaned.pkl").exists():
-                step = "clean"
-            elif (cache_dir / "articles.pkl").exists():
-                step = "fetch"
-            else:
-                step = "started"
+        # 使用实时跟踪的步骤，而不是推断
+        step = self.current_step if self.status == TaskStatus.RUNNING else self.current_step
 
         return {
             "status": self.status.value,

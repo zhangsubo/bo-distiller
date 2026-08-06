@@ -76,6 +76,8 @@ async def get_distill_status():
                     "step": "idle",
                     "started_at": None,
                     "error": None,
+                    "model": None,
+                    "incremental": None,
                     "cache": {
                         "articles_cached": False,
                         "cleaned_cached": False,
@@ -96,6 +98,8 @@ async def get_distill_status():
                 "started_at": progress["started_at"],
                 "finished_at": progress["finished_at"],
                 "error": progress["error"],
+                "model": task.model,
+                "incremental": task.incremental,
                 "cache": progress["cache"],
                 "topics_done": progress["topics_done"],
             }
@@ -116,15 +120,33 @@ async def distill_log_stream():
             yield f"data: {json.dumps({'error': '没有运行中的任务'})}\n\n"
             return
 
-        last_log_index = 0
+        # 从当前日志末尾开始，只发送新增的日志
+        last_log_count = len(task.logs)
+
+        # 先发送最近的50条日志作为初始上下文
+        initial_logs = task.logs[-50:] if len(task.logs) > 50 else task.logs
+        for log in initial_logs:
+            yield f"data: {json.dumps({'log': log})}\n\n"
+
+        heartbeat_counter = 0
 
         while task.status in [TaskStatus.PENDING, TaskStatus.RUNNING]:
+            current_log_count = len(task.logs)
+
             # 发送新日志
-            if last_log_index < len(task.logs):
-                new_logs = task.logs[last_log_index:]
+            if current_log_count > last_log_count:
+                # 只发送新增的日志
+                new_logs = task.logs[last_log_count:]
                 for log in new_logs:
                     yield f"data: {json.dumps({'log': log})}\n\n"
-                last_log_index = len(task.logs)
+                last_log_count = current_log_count
+                heartbeat_counter = 0  # 重置心跳计数
+            else:
+                # 没有新日志时发送心跳，防止连接超时
+                heartbeat_counter += 1
+                if heartbeat_counter >= 10:  # 每5秒发送一次心跳
+                    yield f": heartbeat\n\n"
+                    heartbeat_counter = 0
 
             await asyncio.sleep(0.5)
 
@@ -134,7 +156,11 @@ async def distill_log_stream():
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
 
 

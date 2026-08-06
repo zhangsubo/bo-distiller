@@ -11,6 +11,7 @@ const LogConsole: React.FC = () => {
 
   useEffect(() => {
     if (running) {
+      // 清空日志并连接 SSE
       setLogs([]);
       const es = new EventSource('/api/distill/stream');
       eventSourceRef.current = es;
@@ -24,14 +25,23 @@ const LogConsole: React.FC = () => {
           if (payload.done) {
             es.close();
           }
-        } catch { /* ignore */ }
+          if (payload.error) {
+            console.error('SSE error:', payload.error);
+            es.close();
+          }
+        } catch (err) {
+          console.error('Failed to parse SSE message:', err);
+        }
       };
 
-      es.onerror = () => {
+      es.onerror = (error) => {
+        console.error('EventSource error:', error);
         es.close();
       };
 
-      return () => es.close();
+      return () => {
+        es.close();
+      };
     } else {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();

@@ -3,12 +3,12 @@ from typing import Optional
 
 from rich.console import Console
 
-from .adapters.aggregator import ContentAggregator
 from .cache import CacheManager
 from .config import ConfigManager
 from .llm_client import get_llm_client
 from .processors.cleaner import ContentCleaner
 from .processors.classifier import TopicClassifier
+from .storage import get_storage
 from .synthesizer import KnowledgeSynthesizer
 
 
@@ -23,13 +23,17 @@ def run_distillation(
     console = console or Console()
     config = config_manager.load_config()
 
+    # 从 SQLite 数据库读取已同步的文章，而不是重新抓取
+    console.print("[bold]步骤 1/4: 从数据库加载文章[/bold]")
     articles = cache.load_articles() if incremental else None
     if not articles:
-        aggregator = ContentAggregator(config_manager)
-        articles = aggregator.fetch_all(incremental=incremental)
+        storage = get_storage()
+        articles = storage.get_all_articles()
         if not articles:
-            console.print("[red]>> 未获取到任何文章，请检查内容源配置[/red]")
+            console.print("[red]>> 数据库中没有文章，请先同步内容源[/red]")
+            console.print("[yellow]>> 提示：访问设置页面进行 Cubox 同步[/yellow]")
             return
+        console.print(f"[green]>> 从数据库加载了 {len(articles)} 篇文章[/green]")
         cache.save_articles(articles)
 
     if limit:
