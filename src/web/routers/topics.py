@@ -14,6 +14,15 @@ async def get_topics_config():
         config_manager = get_config_manager()
         config_manager.load_topics()
         topics_data = storage.get_setting("topics") or {}
+
+    # 确保返回的是对象而不是字符串
+    if isinstance(topics_data, str):
+        import json
+        try:
+            topics_data = json.loads(topics_data)
+        except:
+            topics_data = {}
+
     return {"config": topics_data}
 
 

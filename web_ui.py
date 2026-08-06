@@ -6,6 +6,7 @@ Bo-Distiller Web UI
 应用实现已拆分到 src/web/ 包，本文件仅作为启动入口。
 """
 
+import os
 import uvicorn
 
 from src.web.app import create_app
@@ -23,11 +24,14 @@ print(f"[DEBUG] 总计 {len(paths)} 个 API 路由\n")
 
 
 if __name__ == "__main__":
+    # 从环境变量读取端口配置
+    port = int(os.getenv("BACKEND_PORT", 8000))
+
     print("\n" + "=" * 50)
     print("  Bo-Distiller Web UI")
     print("=" * 50)
-    print(f"\n  访问: http://127.0.0.1:8000")
-    print(f"  API 文档: http://127.0.0.1:8000/docs")
+    print(f"\n  访问: http://127.0.0.1:{port}")
+    print(f"  API 文档: http://127.0.0.1:{port}/docs")
     print(f"\n  按 Ctrl+C 停止服务\n")
 
-    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")

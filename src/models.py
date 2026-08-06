@@ -100,11 +100,12 @@ class PromptTemplate(BaseModel):
 
 class ProviderConfig(BaseModel):
     """单个 LLM 提供商配置"""
-    api_key: str = Field(..., description="API Key（支持 ${ENV_VAR} 格式）")
-    api_base: str = Field(..., description="API Base URL")
-    model: str = Field(..., description="模型名称")
+    api_key: Optional[str] = Field(None, description="API Key（支持 ${ENV_VAR} 格式）")
+    api_base: Optional[str] = Field(None, description="API Base URL")
+    model: Optional[str] = Field(None, description="模型名称")
     max_context: int = Field(128000, description="最大上下文窗口")
     max_output: int = Field(8000, description="单次输出最大 token 数")
+    enabled_models: Optional[List[str]] = Field(None, description="启用的模型列表")
 
 
 class LLMConfig(BaseModel):
@@ -123,6 +124,7 @@ class ProcessingConfig(BaseModel):
     batch_temperature: float = Field(0.3, ge=0.0, le=1.0, description="批次提取温度")
     synthesis_temperature: float = Field(0.2, ge=0.0, le=1.0, description="知识整合温度")
     max_article_length: int = Field(0, ge=0, description="文章截取长度（0=不截断）")
+    max_concurrent: int = Field(3, ge=1, le=10, description="并发处理批次数量")
 
 
 class TopicDiscoveryConfig(BaseModel):
@@ -149,11 +151,25 @@ class SyncConfig(BaseModel):
     incremental: bool = Field(True, description="是否增量同步")
 
 
+class DatabaseConfig(BaseModel):
+    """数据库配置"""
+    type: str = Field("sqlite", description="数据库类型：sqlite 或 mysql")
+    sqlite: Dict[str, str] = Field(default_factory=lambda: {"path": "./data/distiller.db"})
+    mysql: Dict[str, Any] = Field(default_factory=lambda: {
+        "host": "127.0.0.1",
+        "port": 3306,
+        "user": "root",
+        "password": "",
+        "database": "distill"
+    })
+
+
 class SystemConfig(BaseModel):
     """系统总配置"""
     project_name: str = Field("bo-distiller", description="项目名称")
     output_dir: str = Field("./output", description="输出目录")
     cache_dir: str = Field(".cache", description="缓存目录")
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     topic_discovery: TopicDiscoveryConfig = Field(default_factory=TopicDiscoveryConfig)

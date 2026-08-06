@@ -16,6 +16,16 @@ NC='\033[0m' # No Color
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGS_DIR="$PROJECT_DIR/logs"
 
+# 加载 .env 配置
+if [ -f "$PROJECT_DIR/.env" ]; then
+    export $(grep -v '^#' "$PROJECT_DIR/.env" | grep -v '^$' | xargs)
+    echo -e "${GREEN}✓${NC} 已加载 .env 配置"
+fi
+
+# 端口配置（从环境变量读取，默认值）
+BACKEND_PORT=${BACKEND_PORT:-8000}
+FRONTEND_PORT=${FRONTEND_PORT:-5173}
+
 # 显示使用说明
 show_usage() {
     echo -e "${BLUE}用法:${NC}"
@@ -71,11 +81,11 @@ start_services() {
 
     # 启动后端
     echo -e "\n${GREEN}启动后端服务...${NC}"
-    python "$PROJECT_DIR/web_ui.py" > "$LOGS_DIR/backend.log" 2>&1 &
+    BACKEND_PORT=$BACKEND_PORT python "$PROJECT_DIR/web_ui.py" > "$LOGS_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
     echo -e "${GREEN}✓${NC} 后端已启动 (PID: $BACKEND_PID)"
-    echo -e "  后端地址: ${BLUE}http://127.0.0.1:8000${NC}"
-    echo -e "  API 文档: ${BLUE}http://127.0.0.1:8000/docs${NC}"
+    echo -e "  后端地址: ${BLUE}http://127.0.0.1:${BACKEND_PORT}${NC}"
+    echo -e "  API 文档: ${BLUE}http://127.0.0.1:${BACKEND_PORT}/docs${NC}"
     echo -e "  日志文件: $LOGS_DIR/backend.log"
 
     # 等待后端启动
@@ -91,11 +101,11 @@ start_services() {
     # 启动前端
     echo -e "\n${GREEN}启动前端服务...${NC}"
     cd "$PROJECT_DIR/frontend"
-    npm run dev > "$LOGS_DIR/frontend.log" 2>&1 &
+    PORT=$FRONTEND_PORT npm run dev > "$LOGS_DIR/frontend.log" 2>&1 &
     FRONTEND_PID=$!
     cd "$PROJECT_DIR"
     echo -e "${GREEN}✓${NC} 前端已启动 (PID: $FRONTEND_PID)"
-    echo -e "  前端地址: ${BLUE}http://localhost:5173${NC}"
+    echo -e "  前端地址: ${BLUE}http://localhost:${FRONTEND_PORT}${NC}"
     echo -e "  日志文件: $LOGS_DIR/frontend.log"
 
     # 保存 PID 到文件
@@ -107,8 +117,8 @@ start_services() {
     echo -e "${GREEN}✓ 启动完成！${NC}"
     echo -e "${BLUE}================================${NC}"
     echo -e "\n访问地址："
-    echo -e "  前端: ${BLUE}http://localhost:5173${NC}"
-    echo -e "  后端: ${BLUE}http://127.0.0.1:8000${NC}"
+    echo -e "  前端: ${BLUE}http://localhost:${FRONTEND_PORT}${NC}"
+    echo -e "  后端: ${BLUE}http://127.0.0.1:${BACKEND_PORT}${NC}"
     echo -e "\n查看日志："
     echo -e "  后端: tail -f $LOGS_DIR/backend.log"
     echo -e "  前端: tail -f $LOGS_DIR/frontend.log"
@@ -174,7 +184,7 @@ show_status() {
         BACKEND_PID=$(cat "$LOGS_DIR/backend.pid")
         if ps -p $BACKEND_PID > /dev/null 2>&1; then
             echo -e "${GREEN}✓${NC} 后端服务: ${GREEN}运行中${NC} (PID: $BACKEND_PID)"
-            echo -e "  地址: http://127.0.0.1:8000"
+            echo -e "  地址: http://127.0.0.1:${BACKEND_PORT}"
             BACKEND_RUNNING=true
         else
             echo -e "${RED}✗${NC} 后端服务: ${RED}已停止${NC}"
@@ -188,7 +198,7 @@ show_status() {
         FRONTEND_PID=$(cat "$LOGS_DIR/frontend.pid")
         if ps -p $FRONTEND_PID > /dev/null 2>&1; then
             echo -e "${GREEN}✓${NC} 前端服务: ${GREEN}运行中${NC} (PID: $FRONTEND_PID)"
-            echo -e "  地址: http://localhost:5173"
+            echo -e "  地址: http://localhost:${FRONTEND_PORT}"
             FRONTEND_RUNNING=true
         else
             echo -e "${RED}✗${NC} 前端服务: ${RED}已停止${NC}"

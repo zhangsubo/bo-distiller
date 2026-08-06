@@ -12,6 +12,8 @@ import {
   clearProviderCache,
   clearAllCache,
   getCacheStats,
+  addProvider,
+  deleteProvider,
   type ProviderMetadata,
   type ProviderModel,
   type CacheStats,
@@ -162,6 +164,40 @@ export function useTestConnectivity() {
       }
 
       return response.json();
+    },
+  });
+}
+
+/**
+ * 添加提供商
+ */
+export function useAddProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (providerId: string) => addProvider(providerId),
+    onSuccess: () => {
+      // 刷新提供商列表
+      queryClient.invalidateQueries({ queryKey: ['llm', 'providers'] });
+      // 刷新缓存统计
+      queryClient.invalidateQueries({ queryKey: ['llm', 'cache', 'stats'] });
+    },
+  });
+}
+
+/**
+ * 删除提供商
+ */
+export function useDeleteProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (providerId: string) => deleteProvider(providerId),
+    onSuccess: () => {
+      // 刷新提供商列表
+      queryClient.invalidateQueries({ queryKey: ['llm', 'providers'] });
+      // 刷新缓存统计
+      queryClient.invalidateQueries({ queryKey: ['llm', 'cache', 'stats'] });
     },
   });
 }

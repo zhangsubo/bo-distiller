@@ -26,6 +26,7 @@ import {
   InfoCircleOutlined,
   ClearOutlined,
   SaveOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import {
   useProviderMetadata,
@@ -39,11 +40,15 @@ const { Text, Paragraph } = Typography;
 interface ProviderMetadataCardProps {
   providerId: string;
   isCached?: boolean;
+  defaultProvider?: string;
+  onDelete?: (providerId: string) => void;
 }
 
 const ProviderMetadataCard: React.FC<ProviderMetadataCardProps> = ({
   providerId,
   isCached = false,
+  defaultProvider,
+  onDelete,
 }) => {
   const [showModels, setShowModels] = useState(false);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
@@ -240,6 +245,25 @@ const ProviderMetadataCard: React.FC<ProviderMetadataCardProps> = ({
                 />
               </Tooltip>
             </Popconfirm>
+            {onDelete && (
+              <Popconfirm
+                title="确定删除此提供商？"
+                description="删除后将清除所有缓存数据"
+                onConfirm={() => onDelete(providerId)}
+                okText="确定"
+                cancelText="取消"
+                disabled={providerId === defaultProvider}
+              >
+                <Tooltip title={providerId === defaultProvider ? '默认提供商不能删除' : '删除提供商'}>
+                  <Button
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    danger
+                    disabled={providerId === defaultProvider}
+                  />
+                </Tooltip>
+              </Popconfirm>
+            )}
           </Space>
         }
         style={{ marginBottom: 16 }}

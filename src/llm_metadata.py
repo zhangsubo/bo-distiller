@@ -143,6 +143,14 @@ class LLMMetadataManager:
         cache_key = self._get_cache_key(provider_id, "metadata")
         cached_data = self.storage.get_setting(cache_key)
 
+        # 确保 cached_data 是字典而不是字符串
+        if isinstance(cached_data, str):
+            import json
+            try:
+                cached_data = json.loads(cached_data)
+            except:
+                return None
+
         if self._is_cache_valid(cached_data):
             # 删除噪音日志，仅在需要时输出
             return cached_data.get("data")
@@ -160,6 +168,14 @@ class LLMMetadataManager:
         """
         cache_key = self._get_cache_key(provider_id, "models")
         cached_data = self.storage.get_setting(cache_key)
+
+        # 确保 cached_data 是字典而不是字符串
+        if isinstance(cached_data, str):
+            import json
+            try:
+                cached_data = json.loads(cached_data)
+            except:
+                return None
 
         if self._is_cache_valid(cached_data):
             # 删除噪音日志

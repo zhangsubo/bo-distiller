@@ -98,6 +98,8 @@ class CuboxAdapter(SourceAdapter):
 
         articles = []
         total = len(cubox_items)
+        saved_count = 0  # 已保存数量
+
         if self.progress_callback:
             self.progress_callback(total, 0, f"开始抓取完整正文（共 {total} 篇）...")
 
@@ -108,17 +110,27 @@ class CuboxAdapter(SourceAdapter):
                 article = self._parse_cubox_item(item, source_config, detail=detail)
                 if article:
                     articles.append(article)
+
+                    # 立即写入单篇文章（边抓取边写入）
+                    if self.use_sqlite and self._storage:
+                        try:
+                            self._storage.save_article(article)
+                            saved_count += 1
+                        except Exception as e:
+                            console.print(f"[yellow]保存文章失败 [{article.title}]: {e}[/yellow]")
+
                 progress.advance(task)
 
                 # 更新进度回调
                 if self.progress_callback:
-                    self.progress_callback(total, idx + 1, f"抓取完整正文... {idx + 1}/{total}")
+                    self.progress_callback(total, idx + 1, f"抓取并保存... {idx + 1}/{total} (已保存 {saved_count} 篇)")
 
-        # 保存到 SQLite
-        if self.use_sqlite and self._storage and articles:
-            saved = self._storage.save_articles(articles)
+        # 标记 URL 重复（在所有文章写入后统一处理）
+        if self.use_sqlite and self._storage and saved_count > 0:
             dupes = self._storage.mark_url_duplicates()
-            console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 文章，标记 {dupes} 条重复 URL[/dim]")
+            console.print(f"[dim]>> 成功保存 {saved_count} 篇 Cubox 文章，标记 {dupes} 条重复 URL[/dim]")
+        elif saved_count == 0:
+            console.print("[yellow]未保存任何文章[/yellow]")
 
         # 补抓空标签文章的标签（Cubox 通常在次日自动补标签）
         if self.use_sqlite and self._storage:
@@ -185,6 +197,8 @@ class CuboxAdapter(SourceAdapter):
 
         articles = []
         total = len(cubox_items)
+        saved_count = 0  # 已保存数量
+
         if self.progress_callback:
             self.progress_callback(total, 0, f"开始增量抓取（共 {total} 篇）...")
 
@@ -195,17 +209,27 @@ class CuboxAdapter(SourceAdapter):
                 article = self._parse_cubox_item(item, source_config, detail=detail)
                 if article:
                     articles.append(article)
+
+                    # 立即写入单篇文章（边抓取边写入）
+                    if self.use_sqlite and self._storage:
+                        try:
+                            self._storage.save_article(article)
+                            saved_count += 1
+                        except Exception as e:
+                            console.print(f"[yellow]保存文章失败 [{article.title}]: {e}[/yellow]")
+
                 progress.advance(task)
 
                 # 更新进度回调
                 if self.progress_callback:
-                    self.progress_callback(total, idx + 1, f"增量抓取... {idx + 1}/{total}")
+                    self.progress_callback(total, idx + 1, f"增量抓取并保存... {idx + 1}/{total} (已保存 {saved_count} 篇)")
 
-        # 保存到 SQLite
-        if self.use_sqlite and self._storage and articles:
-            saved = self._storage.save_articles(articles)
+        # 标记 URL 重复（在所有文章写入后统一处理）
+        if self.use_sqlite and self._storage and saved_count > 0:
             dupes = self._storage.mark_url_duplicates()
-            console.print(f"[dim]>> SQLite：保存 {saved} 篇 Cubox 增量文章，标记 {dupes} 条重复 URL[/dim]")
+            console.print(f"[dim]>> 成功保存 {saved_count} 篇 Cubox 增量文章，标记 {dupes} 条重复 URL[/dim]")
+        elif saved_count == 0:
+            console.print("[yellow]未保存任何增量文章[/yellow]")
 
         # 补抓空标签
         if self.use_sqlite and self._storage:

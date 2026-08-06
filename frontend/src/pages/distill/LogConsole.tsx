@@ -34,9 +34,10 @@ const LogConsole: React.FC = () => {
         }
       };
 
-      es.onerror = (error) => {
-        console.error('EventSource error:', error);
-        es.close();
+      // 不要在 onerror 里 es.close()：EventSource 会自动重连，
+      // close 会让任何瞬时断连变成永久冻结（重连后后端会重发最近50条日志）
+      es.onerror = () => {
+        console.warn('EventSource 连接中断，等待自动重连...');
       };
 
       return () => {

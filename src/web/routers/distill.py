@@ -29,12 +29,13 @@ async def start_distill(body: dict):
         if current_task and current_task.status == TaskStatus.RUNNING:
             raise HTTPException(status_code=409, detail="蒸馏任务已在运行")
 
-        model = body.get("model", "minimax")
+        # model 参数实际是 provider_id（向后兼容旧的 API）
+        provider = body.get("model", "minimax")
         incremental = body.get("incremental", True)
         limit = body.get("limit", None)
 
         task = _task_manager.start_task(
-            model=model,
+            provider=provider,
             incremental=incremental,
             limit=limit,
         )
@@ -43,7 +44,7 @@ async def start_distill(body: dict):
             "status": "ok",
             "message": "蒸馏任务已启动",
             "task": {
-                "model": task.model,
+                "provider": task.provider,
                 "incremental": task.incremental,
                 "started_at": task.started_at.isoformat() if task.started_at else None,
             }
@@ -98,7 +99,7 @@ async def get_distill_status():
                 "started_at": progress["started_at"],
                 "finished_at": progress["finished_at"],
                 "error": progress["error"],
-                "model": task.model,
+                "provider": task.provider,
                 "incremental": task.incremental,
                 "cache": progress["cache"],
                 "topics_done": progress["topics_done"],
@@ -120,8 +121,8 @@ async def distill_log_stream():
             yield f"data: {json.dumps({'error': '没有运行中的任务'})}\n\n"
             return
 
-        # 从当前日志末尾开始，只发送新增的日志
-        last_log_count = len(task.logs)
+        # 用单调序号跟踪进度（logs 超过 1000 条会被截断，len 会停在 1000）
+        last_log_seq = task.log_seq
 
         # 先发送最近的50条日志作为初始上下文
         initial_logs = task.logs[-50:] if len(task.logs) > 50 else task.logs
@@ -131,15 +132,13 @@ async def distill_log_stream():
         heartbeat_counter = 0
 
         while task.status in [TaskStatus.PENDING, TaskStatus.RUNNING]:
-            current_log_count = len(task.logs)
-
             # 发送新日志
-            if current_log_count > last_log_count:
-                # 只发送新增的日志
-                new_logs = task.logs[last_log_count:]
+            if task.log_seq > last_log_seq:
+                new_count = task.log_seq - last_log_seq
+                new_logs = task.logs[-new_count:] if new_count < len(task.logs) else task.logs
                 for log in new_logs:
                     yield f"data: {json.dumps({'log': log})}\n\n"
-                last_log_count = current_log_count
+                last_log_seq = task.log_seq
                 heartbeat_counter = 0  # 重置心跳计数
             else:
                 # 没有新日志时发送心跳，防止连接超时

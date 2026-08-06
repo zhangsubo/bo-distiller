@@ -36,11 +36,11 @@ class DistillTask:
 
     def __init__(
         self,
-        model: str,
+        provider: str,
         incremental: bool = True,
         limit: Optional[int] = None,
     ):
-        self.model = model
+        self.provider = provider  # 提供商 ID
         self.incremental = incremental
         self.limit = limit
 
@@ -49,6 +49,9 @@ class DistillTask:
         self.finished_at: Optional[datetime] = None
         self.error: Optional[str] = None
         self.logs: List[str] = []
+        # 单调递增日志序号：logs 列表会按 1000 条截断，len(logs) 会停在 1000，
+        # SSE 必须用它而不是 len(logs) 来判断是否有新日志
+        self.log_seq: int = 0
         self.current_step: str = "idle"
 
         self._task: Optional[asyncio.Task] = None
@@ -59,6 +62,7 @@ class DistillTask:
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_entry = f"[{timestamp}] {message}"
         self.logs.append(log_entry)
+        self.log_seq += 1
         if len(self.logs) > 1000:  # 限制日志条数
             self.logs = self.logs[-1000:]
 
@@ -142,7 +146,7 @@ class DistillTask:
                 run_distillation(
                     config_manager=config_manager,
                     cache=cache_manager,
-                    model=self.model,
+                    model=self.provider,  # 传递 provider ID
                     incremental=self.incremental,
                     limit=self.limit,
                     console=console,
@@ -215,7 +219,7 @@ class TaskManager:
 
     def start_task(
         self,
-        model: str,
+        provider: str,
         incremental: bool = True,
         limit: Optional[int] = None,
     ) -> DistillTask:
@@ -223,10 +227,11 @@ class TaskManager:
         if self._current_task and self._current_task.status == TaskStatus.RUNNING:
             raise RuntimeError("已有任务在运行")
 
-        task = DistillTask(model, incremental, limit)
+        # 创建新任务
+        task = DistillTask(provider=provider, incremental=incremental, limit=limit)
         self._current_task = task
 
-        # 创建后台任务
+        # 在后台启动任务
         task._task = asyncio.create_task(task.run())
 
         return task

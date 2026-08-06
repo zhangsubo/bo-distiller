@@ -121,3 +121,35 @@ export async function getCacheStats(): Promise<CacheStats> {
   const result = await response.json();
   return result.data;
 }
+
+/**
+ * 添加新的提供商
+ */
+export async function addProvider(providerId: string): Promise<{ status: string; message: string }> {
+  const response = await fetch(`${API_BASE}/api/llm/providers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ provider_id: providerId }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || '添加提供商失败');
+  }
+  return response.json();
+}
+
+/**
+ * 删除提供商
+ */
+export async function deleteProvider(providerId: string): Promise<{ status: string; message: string }> {
+  const response = await fetch(`${API_BASE}/api/llm/providers/${providerId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || '删除提供商失败');
+  }
+  return response.json();
+}

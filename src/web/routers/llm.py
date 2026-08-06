@@ -253,6 +253,90 @@ async def clear_all_cache():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/api/llm/providers")
+async def add_provider(body: dict):
+    """添加新的提供商
+
+    Args:
+        body: 包含 provider_id 的字典
+
+    Returns:
+        操作结果
+    """
+    provider_id = body.get("provider_id")
+    if not provider_id:
+        raise HTTPException(status_code=400, detail="缺少 provider_id 参数")
+
+    # 检查是否已存在
+    if provider_id in SUPPORTED_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"提供商 {provider_id} 已存在")
+
+    manager = get_metadata_manager()
+
+    try:
+        # 尝试获取元数据以验证 provider_id 是否有效
+        metadata = await manager.fetch_provider_metadata(provider_id)
+        if not metadata:
+            raise HTTPException(
+                status_code=404,
+                detail=f"在 models.dev 中未找到提供商 {provider_id}，请检查 ID 是否正确"
+            )
+
+        # 添加到支持列表
+        SUPPORTED_PROVIDERS.append(provider_id)
+
+        # 缓存元数据
+        manager.cache_provider_metadata(provider_id, metadata)
+
+        return {
+            "status": "ok",
+            "message": f"成功添加提供商 {provider_id}",
+            "provider_id": provider_id,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/api/llm/providers/{provider_id}")
+async def delete_provider(provider_id: str):
+    """删除提供商
+
+    Args:
+        provider_id: 提供商 ID
+
+    Returns:
+        操作结果
+    """
+    if provider_id not in SUPPORTED_PROVIDERS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"提供商 {provider_id} 不存在",
+        )
+
+    manager = get_metadata_manager()
+
+    try:
+        # 从支持列表中移除
+        SUPPORTED_PROVIDERS.remove(provider_id)
+
+        # 清除缓存
+        manager.clear_cache(provider_id)
+
+        return {
+            "status": "ok",
+            "message": f"已删除提供商 {provider_id}",
+        }
+
+    except Exception as e:
+        # 如果删除失败，恢复到列表中
+        if provider_id not in SUPPORTED_PROVIDERS:
+            SUPPORTED_PROVIDERS.append(provider_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/api/llm/cache/stats")
 async def get_cache_stats():
     """获取缓存统计信息

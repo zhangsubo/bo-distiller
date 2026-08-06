@@ -215,9 +215,14 @@ class KnowledgeSynthesizer:
         batches: List[List[Article]],
         topic: str,
         completed_batches: List[int],
-        max_concurrent: int = 3,
+        max_concurrent: Optional[int] = None,
     ) -> List[str]:
         """并发处理批次"""
+        # 从配置读取并发数
+        if max_concurrent is None:
+            config = self.config_manager.load_config()
+            max_concurrent = config.processing.max_concurrent
+
         console.print(f"[cyan]>> 并发处理模式：最多同时处理 {max_concurrent} 个批次[/cyan]\n")
 
         # 准备待处理的批次

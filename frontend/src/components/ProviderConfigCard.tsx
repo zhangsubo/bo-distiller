@@ -161,7 +161,9 @@ const ProviderConfigCard: React.FC<ProviderConfigCardProps> = ({
     >
       {isLoading && (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <Spin tip="加载元数据中..." />
+          <Spin tip="加载元数据中...">
+            <div style={{ minHeight: '40px' }} />
+          </Spin>
         </div>
       )}
 

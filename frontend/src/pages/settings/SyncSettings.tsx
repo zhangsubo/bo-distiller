@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Form, Switch, InputNumber, Button, Descriptions, Space, message, Spin, Progress, Alert, Radio } from 'antd';
+import React, { useEffect } from 'react';
+import { Form, Switch, InputNumber, Button, Descriptions, Space, message, Spin, Progress, Alert } from 'antd';
 import { SyncOutlined, StopOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -18,7 +18,6 @@ const SyncSettings: React.FC = () => {
   const queryClient = useQueryClient();
   const { data, isLoading } = useSystemSyncConfig();
   const saveMutation = useSaveSyncConfig();
-  const [syncMode, setSyncMode] = useState<'full' | 'incremental'>('incremental');
 
   // 监控同步状态
   const { data: syncStatus } = useSyncStatus(true);
@@ -86,6 +85,12 @@ const SyncSettings: React.FC = () => {
     }
   };
 
+  const handleSyncNow = () => {
+    // 使用表单中的 incremental 值
+    const incremental = form.getFieldValue('incremental');
+    syncNowMutation.mutate(incremental);
+  };
+
   if (isLoading) return <Spin />;
 
   const isSyncing = syncNowMutation.isPending || syncStatus?.running;
@@ -106,22 +111,11 @@ const SyncSettings: React.FC = () => {
         </Form.Item>
         <Form.Item
           name="incremental"
-          label="增量同步（仅拉取新增收藏）"
+          label="增量同步"
           valuePropName="checked"
+          extra="启用后仅拉取新增收藏，关闭则每次全量同步所有收藏"
         >
           <Switch />
-        </Form.Item>
-
-        <Form.Item label="立即同步模式">
-          <Radio.Group value={syncMode} onChange={(e) => setSyncMode(e.target.value)} disabled={isSyncing}>
-            <Radio.Button value="incremental">增量同步</Radio.Button>
-            <Radio.Button value="full">全量同步</Radio.Button>
-          </Radio.Group>
-          <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-            {syncMode === 'incremental'
-              ? '• 只同步新收藏的文章 + 补抓空标签文章'
-              : '• 重新同步所有文章（耗时较长）'}
-          </div>
         </Form.Item>
 
         <Form.Item>
@@ -131,7 +125,7 @@ const SyncSettings: React.FC = () => {
             </Button>
             <Button
               icon={<SyncOutlined spin={isSyncing} />}
-              onClick={() => syncNowMutation.mutate(syncMode === 'incremental')}
+              onClick={handleSyncNow}
               loading={isSyncing}
               disabled={isSyncing}
             >

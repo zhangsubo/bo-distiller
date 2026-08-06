@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from .models import (
+    DatabaseConfig,
     LLMConfig,
     OutputConfig,
     ProcessingConfig,
@@ -170,11 +171,52 @@ class ConfigManager:
         """解析系统配置"""
         # 提取各部分配置
         project = raw_config.get("project", {})
+        database_raw = raw_config.get("database", {})
         llm_raw = raw_config.get("llm", {})
         processing_raw = raw_config.get("processing", {})
         topic_raw = raw_config.get("topic_discovery", {})
         output_raw = raw_config.get("output", {})
         sync_raw = raw_config.get("sync", {})
+
+        # 解析数据库配置（优先从环境变量读取）
+        from .models import DatabaseConfig
+
+        # 从环境变量读取数据库类型
+        db_type = os.getenv("DATABASE_TYPE", database_raw.get("type", "sqlite"))
+
+        # 准备数据库配置
+        db_config_dict = {
+            "type": db_type,
+            "sqlite": database_raw.get("sqlite", {"path": "./data/distiller.db"}),
+            "mysql": database_raw.get("mysql", {
+                "host": "127.0.0.1",
+                "port": 3306,
+                "user": "root",
+                "password": "",
+                "database": "distill"
+            })
+        }
+
+        # 从环境变量覆盖 SQLite 配置
+        if db_type == "sqlite":
+            sqlite_path = os.getenv("SQLITE_DB_PATH")
+            if sqlite_path:
+                db_config_dict["sqlite"]["path"] = sqlite_path
+
+        # 从环境变量覆盖 MySQL 配置
+        if db_type == "mysql":
+            if os.getenv("MYSQL_HOST"):
+                db_config_dict["mysql"]["host"] = os.getenv("MYSQL_HOST")
+            if os.getenv("MYSQL_PORT"):
+                db_config_dict["mysql"]["port"] = int(os.getenv("MYSQL_PORT"))
+            if os.getenv("MYSQL_USER"):
+                db_config_dict["mysql"]["user"] = os.getenv("MYSQL_USER")
+            if os.getenv("MYSQL_PASSWORD"):
+                db_config_dict["mysql"]["password"] = os.getenv("MYSQL_PASSWORD")
+            if os.getenv("MYSQL_DATABASE"):
+                db_config_dict["mysql"]["database"] = os.getenv("MYSQL_DATABASE")
+
+        database_config = DatabaseConfig(**db_config_dict)
 
         # 解析 LLM 配置
         providers = {}
@@ -209,6 +251,7 @@ class ConfigManager:
             project_name=project.get("name", "bo-distiller"),
             output_dir=project.get("output_dir", "./output"),
             cache_dir=project.get("cache_dir", ".cache"),
+            database=database_config,
             llm=llm_config,
             processing=processing_config,
             topic_discovery=topic_config,
@@ -255,12 +298,7 @@ class ConfigManager:
         if config.output.feishu_enabled and not config.output.feishu_space_id:
             raise ValueError("启用飞书输出但未配置 space_id")
 
-        # 检查 LLM 提供商配置
-        for name, provider in config.llm.providers.items():
-            if not provider.api_key:
-                console.print(f"[yellow]警告: {name} 提供商未配置 API key[/yellow]")
-            elif provider.api_key.startswith("${"):
-                console.print(f"[yellow]警告: {name} 提供商的 API key 环境变量未解析: {provider.api_key}[/yellow]")
+        # 移除对所有提供商的验证，只在实际使用时验证
 
         # 检查默认提供商存在性
         if config.llm.default_provider not in config.llm.providers:

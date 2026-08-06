@@ -13,6 +13,7 @@ from typing import Dict, List, Optional
 from rich.console import Console
 
 from .models import Article, SourceInfo, SourceType
+from .storage_base import StorageBase
 
 console = Console()
 
@@ -20,7 +21,7 @@ console = Console()
 DEFAULT_DB_PATH = Path(__file__).parent.parent / "data" / "distiller.db"
 
 
-class SQLiteStorage:
+class SQLiteStorage(StorageBase):
     """SQLite 存储管理器"""
 
     def __init__(self, db_path: Optional[Path] = None):
@@ -416,12 +417,59 @@ class SQLiteStorage:
 
 
 # 全局单例
-_storage: Optional[SQLiteStorage] = None
+_storage: Optional[StorageBase] = None
 
 
-def get_storage(db_path: Optional[Path] = None) -> SQLiteStorage:
-    """获取存储管理器单例"""
+def get_storage(
+    db_type: str = None,
+    db_path: Optional[Path] = None,
+    mysql_config: Optional[Dict] = None
+) -> StorageBase:
+    """获取存储管理器单例
+
+    Args:
+        db_type: 数据库类型，'sqlite' 或 'mysql'（None 时从配置读取）
+        db_path: SQLite 数据库路径（仅 sqlite 使用）
+        mysql_config: MySQL 配置字典（仅 mysql 使用）
+            {
+                'host': '127.0.0.1',
+                'port': 3306,
+                'user': 'root',
+                'password': 'root',
+                'database': 'distill'
+            }
+
+    Returns:
+        存储管理器实例
+    """
     global _storage
     if _storage is None:
-        _storage = SQLiteStorage(db_path)
+        # 如果没有指定数据库类型，尝试从配置读取
+        if db_type is None:
+            try:
+                from .config import get_config_manager
+                config = get_config_manager().load_config()
+                db_type = config.database.type
+
+                if db_type == "mysql" and mysql_config is None:
+                    mysql_config = config.database.mysql
+                elif db_type == "sqlite" and db_path is None:
+                    db_path = Path(config.database.sqlite.get("path", "./data/distiller.db"))
+            except Exception as e:
+                console.print(f"[yellow]无法从配置加载数据库类型，使用默认 SQLite: {e}[/yellow]")
+                db_type = "sqlite"
+
+        if db_type == "mysql":
+            from .mysql_storage import MySQLStorage
+            if mysql_config is None:
+                raise ValueError("MySQL 配置不能为空")
+            _storage = MySQLStorage(**mysql_config)
+        else:
+            _storage = SQLiteStorage(db_path)
     return _storage
+
+
+def reset_storage():
+    """重置存储单例（主要用于测试）"""
+    global _storage
+    _storage = None

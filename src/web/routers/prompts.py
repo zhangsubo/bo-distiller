@@ -14,6 +14,15 @@ async def get_prompts():
         config_manager = get_config_manager()
         config_manager.load_prompts()
         prompts_data = storage.get_setting("prompts") or {}
+
+    # 确保返回的是对象而不是字符串
+    if isinstance(prompts_data, str):
+        import json
+        try:
+            prompts_data = json.loads(prompts_data)
+        except:
+            prompts_data = {}
+
     return {"prompts": prompts_data}
 
 

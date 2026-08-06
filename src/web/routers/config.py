@@ -14,6 +14,12 @@ async def get_config():
         config_manager = get_config_manager()
         config_manager.load_config()
         config = storage.get_setting("system_config") or {}
+
+    # 确保返回的是对象而不是字符串
+    if isinstance(config, str):
+        import json
+        config = json.loads(config)
+
     return {"config": config, "status": "ok"}
 
 
@@ -35,6 +41,15 @@ async def get_sources():
         config_manager = get_config_manager()
         config_manager.load_sources()
         sources_data = storage.get_setting("sources") or {}
+
+    # 确保返回的是对象而不是字符串
+    if isinstance(sources_data, str):
+        import json
+        try:
+            sources_data = json.loads(sources_data)
+        except:
+            sources_data = {}
+
     return {"sources": sources_data.get("sources", [])}
 
 

@@ -1,3 +1,13 @@
+database:
+  mysql:
+    database: ${MYSQL_DATABASE:-distill}
+    host: ${MYSQL_HOST:-127.0.0.1}
+    password: ${MYSQL_PASSWORD:-root}
+    port: ${MYSQL_PORT:-3306}
+    user: ${MYSQL_USER:-root}
+  sqlite:
+    path: ./data/distiller.db
+  type: sqlite
 features:
   incremental_update: true
   knowledge_graph: false

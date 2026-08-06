@@ -99,7 +99,7 @@ const SourceSettings: React.FC = () => {
         open={modalOpen}
         onOk={handleAdd}
         onCancel={() => setModalOpen(false)}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}>

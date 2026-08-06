@@ -18,6 +18,7 @@ import {
   Statistic,
   Popconfirm,
   Tooltip,
+  Modal,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -26,6 +27,8 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ApiOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { useConfig, useSaveConfig } from '../../hooks/useConfig';
 import { LLM_MODELS } from '../../utils/constants';
@@ -36,6 +39,8 @@ import {
   useRefreshAllProviders,
   useClearAllCache,
   useTestConnectivity,
+  useAddProvider,
+  useDeleteProvider,
 } from '../../hooks/useLLMMetadata';
 import ProviderMetadataCard from '../../components/ProviderMetadataCard';
 import ProviderConfigCard from '../../components/ProviderConfigCard';
@@ -56,6 +61,15 @@ const LLMSettings: React.FC = () => {
   const refreshAllMutation = useRefreshAllProviders();
   const clearAllCacheMutation = useClearAllCache();
   const testConnectivityMutation = useTestConnectivity();
+  const addProviderMutation = useAddProvider();
+  const deleteProviderMutation = useDeleteProvider();
+
+  // 添加提供商弹窗状态
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newProviderId, setNewProviderId] = useState('');
+
+  // 处理参数说明弹窗状态
+  const [isParamsHelpOpen, setIsParamsHelpOpen] = useState(false);
 
   // 测试自定义提供商连通性
   const handleTestCustomConnectivity = async () => {
@@ -98,6 +112,7 @@ const LLMSettings: React.FC = () => {
         batch_temperature: data.config.processing.batch_temperature,
         synthesis_temperature: data.config.processing.synthesis_temperature,
         safety_margin: data.config.processing.safety_margin,
+        max_concurrent: data.config.processing.max_concurrent,
         max_article_length: data.config.processing.max_article_length,
         providers: data.config.llm.providers,
       });
@@ -139,6 +154,7 @@ const LLMSettings: React.FC = () => {
           batch_temperature: values.batch_temperature,
           synthesis_temperature: values.synthesis_temperature,
           safety_margin: values.safety_margin,
+          max_concurrent: values.max_concurrent,
           max_article_length: values.max_article_length,
         },
       };
@@ -167,6 +183,33 @@ const LLMSettings: React.FC = () => {
       message.success('已清除所有缓存');
     } catch (error) {
       message.error(`清除缓存失败: ${error}`);
+    }
+  };
+
+  // 添加提供商
+  const handleAddProvider = async () => {
+    if (!newProviderId.trim()) {
+      message.warning('请输入 Provider ID');
+      return;
+    }
+
+    try {
+      const result = await addProviderMutation.mutateAsync(newProviderId.trim());
+      message.success(result.message || '添加成功');
+      setIsAddModalOpen(false);
+      setNewProviderId('');
+    } catch (error: any) {
+      message.error(error.message || '添加失败');
+    }
+  };
+
+  // 删除提供商
+  const handleDeleteProvider = async (providerId: string) => {
+    try {
+      const result = await deleteProviderMutation.mutateAsync(providerId);
+      message.success(result.message || '删除成功');
+    } catch (error: any) {
+      message.error(error.message || '删除失败');
     }
   };
 
@@ -302,9 +345,19 @@ const LLMSettings: React.FC = () => {
                   )
                 )}
 
-                <Divider>处理参数</Divider>
+                <Divider>
+                  处理参数
+                  <Tooltip title="查看参数详细说明">
+                    <Button
+                      type="link"
+                      icon={<QuestionCircleOutlined />}
+                      onClick={() => setIsParamsHelpOpen(true)}
+                      style={{ marginLeft: 8 }}
+                    />
+                  </Tooltip>
+                </Divider>
 
-                <Space wrap>
+                <Space wrap style={{ alignItems: 'flex-start' }}>
                   <Form.Item name="batch_temperature" label="批次提取温度">
                     <InputNumber min={0} max={1} step={0.1} style={{ width: 120 }} />
                   </Form.Item>
@@ -314,8 +367,11 @@ const LLMSettings: React.FC = () => {
                   <Form.Item name="safety_margin" label="安全系数">
                     <InputNumber min={0.5} max={1} step={0.05} style={{ width: 120 }} />
                   </Form.Item>
-                  <Form.Item name="max_article_length" label="文章截取长度 (0=不截断)">
+                  <Form.Item name="max_article_length" label="文章截取长度" extra="0=不截断">
                     <InputNumber min={0} step={500} style={{ width: 150 }} />
+                  </Form.Item>
+                  <Form.Item name="max_concurrent" label="并发处理批次数" extra="同时处理的批次数量（1-10）">
+                    <InputNumber min={1} max={10} step={1} style={{ width: 120 }} />
                   </Form.Item>
                 </Space>
 
@@ -352,29 +408,39 @@ const LLMSettings: React.FC = () => {
                       />
                     </Col>
                     <Col span={8}>
-                      <Space>
+                      <Space direction="vertical" style={{ width: '100%' }}>
                         <Button
-                          icon={<ReloadOutlined />}
-                          onClick={handleRefreshAll}
-                          loading={refreshAllMutation.isPending}
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={() => setIsAddModalOpen(true)}
+                          block
                         >
-                          刷新所有
+                          添加提供商
                         </Button>
-                        <Popconfirm
-                          title="确定清除所有缓存？"
-                          description="清除后需要重新获取元数据"
-                          onConfirm={handleClearAllCache}
-                          okText="确定"
-                          cancelText="取消"
-                        >
+                        <Space>
                           <Button
-                            icon={<ClearOutlined />}
-                            loading={clearAllCacheMutation.isPending}
-                            danger
+                            icon={<ReloadOutlined />}
+                            onClick={handleRefreshAll}
+                            loading={refreshAllMutation.isPending}
                           >
-                            清除所有缓存
+                            刷新所有
                           </Button>
-                        </Popconfirm>
+                          <Popconfirm
+                            title="确定清除所有缓存？"
+                            description="清除后需要重新获取元数据"
+                            onConfirm={handleClearAllCache}
+                            okText="确定"
+                            cancelText="取消"
+                          >
+                            <Button
+                              icon={<ClearOutlined />}
+                              loading={clearAllCacheMutation.isPending}
+                              danger
+                            >
+                              清除所有缓存
+                            </Button>
+                          </Popconfirm>
+                        </Space>
                       </Space>
                     </Col>
                   </Row>
@@ -415,15 +481,199 @@ const LLMSettings: React.FC = () => {
                         key={providerId}
                         providerId={providerId}
                         isCached={cacheStats?.[providerId]?.metadata_cached}
+                        defaultProvider={data?.config?.llm?.default_provider}
+                        onDelete={handleDeleteProvider}
                       />
                     ))}
                   </>
                 )}
+
+                {/* 添加提供商弹窗 */}
+                <Modal
+                  title="添加提供商"
+                  open={isAddModalOpen}
+                  onOk={handleAddProvider}
+                  onCancel={() => {
+                    setIsAddModalOpen(false);
+                    setNewProviderId('');
+                  }}
+                  confirmLoading={addProviderMutation.isPending}
+                  okText="添加"
+                  cancelText="取消"
+                >
+                  <Form layout="vertical" style={{ marginTop: 16 }}>
+                    <Form.Item
+                      label="Provider ID"
+                      required
+                      extra={
+                        <span>
+                          请输入 <a href="https://models.dev" target="_blank" rel="noopener noreferrer">models.dev</a> 中的 Provider ID
+                        </span>
+                      }
+                    >
+                      <Input
+                        placeholder="例如: openai, anthropic, google"
+                        value={newProviderId}
+                        onChange={(e) => setNewProviderId(e.target.value)}
+                        onPressEnter={handleAddProvider}
+                      />
+                    </Form.Item>
+                  </Form>
+                </Modal>
               </div>
             ),
           },
         ]}
       />
+
+      {/* 处理参数说明弹窗 - 移到 Tabs 外部 */}
+      <Modal
+        title="处理参数详细说明"
+        open={isParamsHelpOpen}
+        onCancel={() => setIsParamsHelpOpen(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsParamsHelpOpen(false)}>
+            关闭
+          </Button>
+        ]}
+        width={800}
+      >
+        <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
+          <Title level={4}>1. 批次提取温度 (batch_temperature)</Title>
+          <Text>
+            <ul>
+              <li><strong>默认值</strong>: 0.3</li>
+              <li><strong>范围</strong>: 0.0 - 1.0</li>
+              <li><strong>作用</strong>: 控制从文章批次中提取核心观点时的随机性</li>
+            </ul>
+            <p><strong>含义</strong>:</p>
+            <ul>
+              <li>温度 = 0: 完全确定性，每次提取的内容几乎一致</li>
+              <li>温度较低 (0.1-0.3): 提取结果稳定、聚焦，更倾向于提取明确的核心观点</li>
+              <li>温度较高 (0.7-1.0): 提取结果更有创造性和多样性，但可能不够聚焦</li>
+            </ul>
+            <p><strong>推荐设置</strong>: 0.3（默认）- 保证提取的观点准确且聚焦</p>
+          </Text>
+
+          <Divider />
+
+          <Title level={4}>2. 整合温度 (synthesis_temperature)</Title>
+          <Text>
+            <ul>
+              <li><strong>默认值</strong>: 0.2</li>
+              <li><strong>范围</strong>: 0.0 - 1.0</li>
+              <li><strong>作用</strong>: 控制整合多个批次结果时的随机性</li>
+            </ul>
+            <p><strong>含义</strong>:</p>
+            <ul>
+              <li>温度 = 0: 整合结果高度一致，严格按照原文归纳</li>
+              <li>温度较低 (0.1-0.3): 整合结果稳定、严谨，更忠实于原文</li>
+              <li>温度较高 (0.7-1.0): 整合时有更多创造性，可能产生新的见解</li>
+            </ul>
+            <p><strong>为什么比批次提取温度更低？</strong></p>
+            <p>批次提取是从原文提取观点（允许一定灵活性），整合是汇总已提取的观点（需要更高准确性）。</p>
+            <p><strong>推荐设置</strong>: 0.2（默认）- 确保最终文档的一致性和准确性</p>
+          </Text>
+
+          <Divider />
+
+          <Title level={4}>3. 安全系数 (safety_margin)</Title>
+          <Text>
+            <ul>
+              <li><strong>默认值</strong>: 0.9</li>
+              <li><strong>范围</strong>: 0.5 - 1.0</li>
+              <li><strong>作用</strong>: 控制上下文窗口的使用率，防止超出 token 限制</li>
+            </ul>
+            <p><strong>计算公式</strong>:</p>
+            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+              可用 tokens = (最大上下文 - 最大输出 - 预留 tokens) × 安全系数
+            </pre>
+            <p><strong>不同设置的影响</strong>:</p>
+            <ul>
+              <li>0.9 (推荐): 留 10% 余量，非常安全，适合大多数场景</li>
+              <li>0.95: 留 5% 余量，更充分利用上下文，但风险略高</li>
+              <li>0.8: 留 20% 余量，非常保守，适合不稳定的 API</li>
+            </ul>
+            <p><strong>为什么需要安全系数？</strong></p>
+            <p>Token 计数可能不完全准确，不同模型的 token 化方式有差异，避免因超出限制导致 API 调用失败。</p>
+          </Text>
+
+          <Divider />
+
+          <Title level={4}>4. 文章截取长度 (max_article_length)</Title>
+          <Text>
+            <ul>
+              <li><strong>默认值</strong>: 0</li>
+              <li><strong>范围</strong>: 0 或任意正整数</li>
+              <li><strong>作用</strong>: 限制每篇文章的最大字符数，0 表示不截断</li>
+            </ul>
+            <p><strong>使用场景</strong>:</p>
+            <ul>
+              <li><strong>0 (不截断)</strong>: 使用文章完整内容，不丢失任何信息</li>
+              <li><strong>3000</strong>: 只使用文章前 3000 个字符，快速处理</li>
+              <li><strong>5000</strong>: 只使用文章前 5000 个字符，平衡完整性和速度</li>
+            </ul>
+            <p><strong>推荐设置</strong>: 0（默认）- 除非遇到超长文章问题</p>
+          </Text>
+
+          <Divider />
+
+          <Title level={4}>5. 并发处理批次数 (max_concurrent)</Title>
+          <Text>
+            <ul>
+              <li><strong>默认值</strong>: 3</li>
+              <li><strong>范围</strong>: 1 - 10</li>
+              <li><strong>作用</strong>: 同时处理的批次数量</li>
+            </ul>
+            <p><strong>速度对比</strong>（假设 30 个批次，每批次 10 秒）:</p>
+            <ul>
+              <li>并发数 = 1: 300 秒 (5 分钟) - 串行处理</li>
+              <li>并发数 = 3: 100 秒 (1.6 分钟) - 默认推荐</li>
+              <li>并发数 = 5: 60 秒 (1 分钟) - 高速处理</li>
+              <li>并发数 = 10: 30 秒 - 最高并发</li>
+            </ul>
+            <p><strong>不同场景建议</strong>:</p>
+            <ul>
+              <li><strong>1</strong>: API 有严格速率限制</li>
+              <li><strong>3</strong>: 默认推荐，适合大多数场景</li>
+              <li><strong>5-10</strong>: 本地模型或无限制 API</li>
+            </ul>
+            <p><strong>注意</strong>: 并发数过高可能触发 API 速率限制（429 错误）</p>
+          </Text>
+
+          <Divider />
+
+          <Title level={4}>参数组合建议</Title>
+          <Text>
+            <p><strong>追求准确性（默认推荐）</strong>:</p>
+            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+              批次提取温度: 0.3{'\n'}
+              整合温度: 0.2{'\n'}
+              安全系数: 0.9{'\n'}
+              文章截取长度: 0{'\n'}
+              并发处理批次数: 3
+            </pre>
+
+            <p><strong>追求速度</strong>:</p>
+            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+              批次提取温度: 0.3{'\n'}
+              整合温度: 0.2{'\n'}
+              安全系数: 0.9{'\n'}
+              文章截取长度: 3000 (截取文章){'\n'}
+              并发处理批次数: 5 (提高并发)
+            </pre>
+
+            <p><strong>API 限制严格</strong>:</p>
+            <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+              批次提取温度: 0.3{'\n'}
+              整合温度: 0.2{'\n'}
+              安全系数: 0.8 (更保守){'\n'}
+              文章截取长度: 0{'\n'}
+              并发处理批次数: 1 (串行处理)
+            </pre>
+          </Text>
+        </div>
+      </Modal>
     </div>
   );
 };
