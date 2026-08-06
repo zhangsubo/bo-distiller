@@ -90,17 +90,47 @@ async def delete_article(article_id: str):
 # ==================== Cubox 同步 API ====================
 
 @router.post("/api/articles/sync")
-async def sync_cubox():
-    """同步 Cubox 收藏（含完整正文、批注、AI 洞见）"""
+async def sync_cubox(incremental: bool = Query(False, description="是否增量同步")):
+    """启动 Cubox 同步（异步后台任务）
+
+    Args:
+        incremental: True=增量同步（仅拉取新增+补抓空标签），False=全量同步
+    """
     try:
         from src.services.sync_service import run_sync
 
-        return run_sync()
+        return run_sync(incremental=incremental, background=True)
     except ValueError as e:
-        # Cubox CLI 不可用
+        # Cubox CLI 不可用或已有任务运行
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/articles/sync/status")
+async def get_sync_status():
+    """查询同步任务状态"""
+    try:
+        from src.services.sync_service import get_sync_status
+
+        return get_sync_status()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/articles/sync/cancel")
+async def cancel_sync():
+    """取消正在运行的同步任务"""
+    try:
+        from src.services.sync_service import cancel_sync
+
+        return cancel_sync()
     except Exception as e:
         import traceback
         traceback.print_exc()

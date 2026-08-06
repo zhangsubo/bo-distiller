@@ -24,8 +24,9 @@ console = Console()
 class CuboxAdapter(SourceAdapter):
     """Cubox CLI 适配器"""
 
-    def __init__(self, use_sqlite: bool = True):
+    def __init__(self, use_sqlite: bool = True, progress_callback=None):
         self.use_sqlite = use_sqlite
+        self.progress_callback = progress_callback
         self._storage: Optional[SQLiteStorage] = None
         if use_sqlite:
             self._storage = get_storage()
@@ -96,14 +97,22 @@ class CuboxAdapter(SourceAdapter):
             raise Exception(f"Cubox CLI 输出解析失败: {e}")
 
         articles = []
+        total = len(cubox_items)
+        if self.progress_callback:
+            self.progress_callback(total, 0, f"开始抓取完整正文（共 {total} 篇）...")
+
         with Progress() as progress:
-            task = progress.add_task("[cyan]抓取完整正文...", total=len(cubox_items))
-            for item in cubox_items:
+            task = progress.add_task("[cyan]抓取完整正文...", total=total)
+            for idx, item in enumerate(cubox_items):
                 detail = self.fetch_card_detail(item.get("id", ""))
                 article = self._parse_cubox_item(item, source_config, detail=detail)
                 if article:
                     articles.append(article)
                 progress.advance(task)
+
+                # 更新进度回调
+                if self.progress_callback:
+                    self.progress_callback(total, idx + 1, f"抓取完整正文... {idx + 1}/{total}")
 
         # 保存到 SQLite
         if self.use_sqlite and self._storage and articles:
@@ -175,14 +184,22 @@ class CuboxAdapter(SourceAdapter):
             raise Exception(f"Cubox CLI 输出解析失败: {e}")
 
         articles = []
+        total = len(cubox_items)
+        if self.progress_callback:
+            self.progress_callback(total, 0, f"开始增量抓取（共 {total} 篇）...")
+
         with Progress() as progress:
-            task = progress.add_task("[cyan]增量抓取完整正文...", total=len(cubox_items))
-            for item in cubox_items:
+            task = progress.add_task("[cyan]增量抓取完整正文...", total=total)
+            for idx, item in enumerate(cubox_items):
                 detail = self.fetch_card_detail(item.get("id", ""))
                 article = self._parse_cubox_item(item, source_config, detail=detail)
                 if article:
                     articles.append(article)
                 progress.advance(task)
+
+                # 更新进度回调
+                if self.progress_callback:
+                    self.progress_callback(total, idx + 1, f"增量抓取... {idx + 1}/{total}")
 
         # 保存到 SQLite
         if self.use_sqlite and self._storage and articles:
@@ -352,10 +369,19 @@ class CuboxAdapter(SourceAdapter):
 
         console.print(f"[dim]>> 检查 {len(need_refresh)} 篇空标签文章是否已更新标签...[/dim]")
         updated = 0
+        total = len(need_refresh)
 
-        for article in need_refresh:
+        if self.progress_callback:
+            self.progress_callback(total, 0, f"补抓空标签文章（共 {total} 篇）...")
+
+        for idx, article in enumerate(need_refresh):
             cubox_id = (article.metadata or {}).get("cubox_id", article.id)
             detail = self.fetch_card_detail(cubox_id)
+
+            # 更新进度
+            if self.progress_callback:
+                self.progress_callback(total, idx + 1, f"补抓空标签... {idx + 1}/{total}")
+
             if not detail:
                 continue
 

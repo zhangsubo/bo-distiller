@@ -144,7 +144,7 @@ class LLMMetadataManager:
         cached_data = self.storage.get_setting(cache_key)
 
         if self._is_cache_valid(cached_data):
-            console.print(f"[dim]>> 使用缓存: {provider_id} 元数据[/dim]")
+            # 删除噪音日志，仅在需要时输出
             return cached_data.get("data")
 
         return None
@@ -162,7 +162,7 @@ class LLMMetadataManager:
         cached_data = self.storage.get_setting(cache_key)
 
         if self._is_cache_valid(cached_data):
-            console.print(f"[dim]>> 使用缓存: {provider_id} 模型列表[/dim]")
+            # 删除噪音日志
             return cached_data.get("data")
 
         return None
@@ -180,7 +180,7 @@ class LLMMetadataManager:
             "cached_at": datetime.now().isoformat(),
         }
         self.storage.set_setting(cache_key, cache_data)
-        console.print(f"[dim]>> 已缓存 {provider_id} 元数据[/dim]")
+        # 删除噪音日志
 
     def cache_provider_models(self, provider_id: str, models: List[Dict]):
         """缓存提供商模型列表
@@ -195,7 +195,7 @@ class LLMMetadataManager:
             "cached_at": datetime.now().isoformat(),
         }
         self.storage.set_setting(cache_key, cache_data)
-        console.print(f"[dim]>> 已缓存 {provider_id} 模型列表[/dim]")
+        # 删除噪音日志
 
     async def get_or_fetch_provider_metadata(
         self, provider_id: str, force_refresh: bool = False

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchArticles, fetchArticle, deleteArticle, fetchArticleStats, syncCubox } from '../api/articles';
+import { fetchArticles, fetchArticle, deleteArticle, fetchArticleStats, syncCubox, getSyncStatus } from '../api/articles';
 
 export function useArticles(params: {
   page?: number;
@@ -47,6 +47,19 @@ export function useSyncCubox() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['articles'] });
       queryClient.invalidateQueries({ queryKey: ['articleStats'] });
+    },
+  });
+}
+
+export function useSyncStatus(enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['syncStatus'],
+    queryFn: getSyncStatus,
+    enabled,
+    refetchInterval: (query) => {
+      // 如果正在同步，每2秒轮询一次
+      const data = query.state.data as any;
+      return data?.running ? 2000 : false;
     },
   });
 }

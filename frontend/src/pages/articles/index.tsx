@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Table, Input, Select, Space, Card, Tag, Button, message, Popconfirm, Row, Col, Statistic } from 'antd';
-import { SearchOutlined, ReloadOutlined, DeleteOutlined, CloudSyncOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
-import { useArticles, useDeleteArticle, useArticleStats, useSyncCubox } from '../../hooks/useArticles';
+import { useArticles, useDeleteArticle, useArticleStats } from '../../hooks/useArticles';
 import { SOURCE_TYPES, PAGE_SIZE } from '../../utils/constants';
 import { formatShortDate } from '../../utils/format';
 import type { Article } from '../../api/types';
@@ -23,16 +23,6 @@ const ArticlesPage: React.FC = () => {
 
   const { data: stats } = useArticleStats();
   const deleteMutation = useDeleteArticle();
-  const syncMutation = useSyncCubox();
-
-  const handleSync = async () => {
-    try {
-      const result = await syncMutation.mutateAsync();
-      message.success(result.message);
-    } catch (err: unknown) {
-      message.error((err as Error).message || '同步失败');
-    }
-  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -134,14 +124,6 @@ const ArticlesPage: React.FC = () => {
           style={{ width: 150 }}
           options={SOURCE_TYPES}
         />
-        <Button
-          type="primary"
-          icon={<CloudSyncOutlined />}
-          onClick={handleSync}
-          loading={syncMutation.isPending}
-        >
-          同步 Cubox
-        </Button>
         <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
           刷新
         </Button>

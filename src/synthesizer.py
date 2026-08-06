@@ -4,6 +4,7 @@ Bo-Distiller 知识合成模块
 实现两阶段合成：批次提取 → 知识整合
 """
 
+import asyncio
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -134,6 +135,143 @@ class KnowledgeSynthesizer:
             max_tokens=self.max_output,
         )
 
+    async def extract_batch_insights_async(
+        self,
+        articles: List[Article],
+        topic: str,
+        batch_index: int,
+    ) -> tuple[int, str]:
+        """异步提取批次洞察
+
+        Args:
+            articles: 文章列表
+            topic: 主题名称
+            batch_index: 批次索引
+
+        Returns:
+            (批次索引, 洞察内容) 元组
+        """
+        # 在线程池中运行同步方法
+        loop = asyncio.get_event_loop()
+        insight = await loop.run_in_executor(
+            None,
+            self.extract_batch_insights,
+            articles,
+            topic,
+        )
+        return (batch_index, insight)
+
+    def _process_batches_sequential(
+        self,
+        batches: List[List[Article]],
+        topic: str,
+        completed_batches: List[int],
+    ) -> List[str]:
+        """串行处理批次（原有逻辑）"""
+        batch_insights = []
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("合成中...", total=len(batches))
+
+            for i, batch in enumerate(batches):
+                # 检查缓存
+                if i in completed_batches:
+                    cached = self.cache.load_batch_result(topic, i)
+                    if cached:
+                        batch_insights.append(cached)
+                        progress.update(
+                            task, description=f"[{i + 1}/{len(batches)}] (使用缓存)..."
+                        )
+                        progress.advance(task)
+                        continue
+
+                # 处理新批次
+                progress.update(
+                    task, description=f"处理批次 {i + 1}/{len(batches)}..."
+                )
+
+                try:
+                    insight = self.extract_batch_insights(batch, topic)
+                    batch_insights.append(insight)
+
+                    # 保存批次结果
+                    self.cache.save_batch_result(topic, i, insight)
+
+                except Exception as e:
+                    console.print(f"\n[red]批次 {i + 1} 处理失败: {e}[/red]")
+                    console.print("[yellow]>> 进度已保存，可使用相同命令继续[/yellow]\n")
+                    raise
+
+                progress.advance(task)
+
+        return batch_insights
+
+    def _process_batches_concurrent(
+        self,
+        batches: List[List[Article]],
+        topic: str,
+        completed_batches: List[int],
+        max_concurrent: int = 3,
+    ) -> List[str]:
+        """并发处理批次"""
+        console.print(f"[cyan]>> 并发处理模式：最多同时处理 {max_concurrent} 个批次[/cyan]\n")
+
+        # 准备待处理的批次
+        pending_batches = []
+        batch_insights = [None] * len(batches)  # 预分配结果列表
+
+        for i, batch in enumerate(batches):
+            if i in completed_batches:
+                cached = self.cache.load_batch_result(topic, i)
+                if cached:
+                    batch_insights[i] = cached
+                    console.print(f"[green]批次 {i + 1}/{len(batches)} (使用缓存)[/green]")
+                else:
+                    pending_batches.append((i, batch))
+            else:
+                pending_batches.append((i, batch))
+
+        if not pending_batches:
+            return [ins for ins in batch_insights if ins is not None]
+
+        # 异步处理待处理的批次
+        async def process_all():
+            semaphore = asyncio.Semaphore(max_concurrent)
+
+            async def process_with_semaphore(batch_index, batch):
+                async with semaphore:
+                    console.print(f"[yellow]开始处理批次 {batch_index + 1}/{len(batches)}...[/yellow]")
+                    try:
+                        _, insight = await self.extract_batch_insights_async(batch, topic, batch_index)
+
+                        # 保存批次结果
+                        self.cache.save_batch_result(topic, batch_index, insight)
+                        batch_insights[batch_index] = insight
+
+                        console.print(f"[green]✓ 完成批次 {batch_index + 1}/{len(batches)}[/green]")
+                        return insight
+                    except Exception as e:
+                        console.print(f"[red]✗ 批次 {batch_index + 1} 处理失败: {e}[/red]")
+                        raise
+
+            # 创建所有任务
+            tasks = [
+                process_with_semaphore(batch_index, batch)
+                for batch_index, batch in pending_batches
+            ]
+
+            # 并发执行
+            await asyncio.gather(*tasks)
+
+        # 运行异步处理
+        asyncio.run(process_all())
+
+        return [ins for ins in batch_insights if ins is not None]
+
     def synthesize_batches(
         self,
         batch_results: List[str],
@@ -223,46 +361,10 @@ class KnowledgeSynthesizer:
         if completed_batches:
             console.print(f"[yellow]>> 发现已完成的批次: {completed_batches}[/yellow]")
 
-        # 处理每一批
-        batch_insights = []
-
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("合成中...", total=len(batches))
-
-            for i, batch in enumerate(batches):
-                # 检查缓存
-                if i in completed_batches:
-                    cached = self.cache.load_batch_result(topic, i)
-                    if cached:
-                        batch_insights.append(cached)
-                        progress.update(
-                            task, description=f"[{i + 1}/{len(batches)}] (使用缓存)..."
-                        )
-                        progress.advance(task)
-                        continue
-
-                # 处理新批次
-                progress.update(
-                    task, description=f"处理批次 {i + 1}/{len(batches)}..."
-                )
-
-                try:
-                    insight = self.extract_batch_insights(batch, topic)
-                    batch_insights.append(insight)
-
-                    # 保存批次结果
-                    self.cache.save_batch_result(topic, i, insight)
-
-                except Exception as e:
-                    console.print(f"\n[red]批次 {i + 1} 处理失败: {e}[/red]")
-                    console.print("[yellow]>> 进度已保存，可使用相同命令继续[/yellow]\n")
-                    raise
-
-                progress.advance(task)
+        # 处理每一批（支持并发）
+        batch_insights = self._process_batches_concurrent(
+            batches, topic, completed_batches, max_concurrent=3
+        )
 
         # 最终整合
         console.print(f"[yellow]最终整合 {len(batch_insights)} 批结果...[/yellow]")

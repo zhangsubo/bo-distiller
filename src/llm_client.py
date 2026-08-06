@@ -22,7 +22,7 @@ from openai import (
     AsyncOpenAI,
     APIError,
     RateLimitError,
-    Timeout,
+    APITimeoutError,
     AuthenticationError,
     APIConnectionError,
 )
@@ -202,7 +202,7 @@ class LLMClient:
             raise Exception(f"认证失败 ({self.provider}): 请检查 API Key")
         except RateLimitError as e:
             raise Exception(f"速率限制 ({self.provider}): {e}")
-        except Timeout as e:
+        except APITimeoutError as e:
             raise Exception(f"请求超时 ({self.provider}): {e}")
         except APIConnectionError as e:
             raise Exception(f"网络连接失败 ({self.provider}): {e}")
@@ -230,7 +230,7 @@ class LLMClient:
             raise Exception(f"认证失败 ({self.provider}): 请检查 API Key")
         except RateLimitError as e:
             raise Exception(f"速率限制 ({self.provider}): {e}")
-        except Timeout as e:
+        except APITimeoutError as e:
             raise Exception(f"请求超时 ({self.provider}): {e}")
         except APIConnectionError as e:
             raise Exception(f"网络连接失败 ({self.provider}): {e}")
