@@ -1,0 +1,185 @@
+/* 知识库 wiki 页样式
+ * 主题变量来自全局 styles/themes.css（<html data-theme>），本文件只含知识库专属结构
+ */
+
+.kb-wiki .kb-sidebar {
+  border-right: 1px solid var(--theme-border);
+}
+
+/* 列表行（首页主题 / 主题页条目） */
+.kb-wiki .kb-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--theme-border);
+  cursor: pointer;
+}
+.kb-wiki .kb-row--entry {
+  padding: 10px 0;
+  border-bottom-style: dashed;
+}
+.kb-wiki .kb-row-title {
+  font-family: var(--theme-heading-font);
+  font-weight: 600;
+  color: var(--theme-accent);
+}
+.kb-wiki .kb-row-icon {
+  color: var(--theme-accent);
+}
+.kb-wiki .kb-row-meta {
+  font-size: 12px;
+  color: var(--theme-text-muted);
+}
+.kb-wiki .kb-row-summary {
+  font-size: 13px;
+  color: var(--theme-text-secondary);
+  margin-top: 4px;
+  padding-left: 22px;
+}
+
+.kb-wiki .kb-section-title {
+  font-family: var(--theme-heading-font);
+  border-bottom: 1px solid var(--theme-border);
+  padding-bottom: 8px;
+}
+
+.kb-wiki .kb-page-title {
+  font-family: var(--theme-heading-font);
+}
+.kb-wiki .kb-text-secondary {
+  color: var(--theme-text-secondary);
+}
+.kb-wiki .kb-text-body {
+  color: var(--theme-text-body);
+}
+
+/* ==================== Neubrutalism ==================== */
+
+:root[data-theme='neubrutalism'] .kb-wiki .kb-sidebar {
+  border-right: 3px solid #000;
+}
+
+:root[data-theme='neubrutalism'] .kb-wiki .ant-tree .ant-tree-node-content-wrapper {
+  border-radius: 0;
+  font-weight: 700;
+}
+:root[data-theme='neubrutalism'] .kb-wiki .ant-tree .ant-tree-node-content-wrapper:hover {
+  background: #fff9c4;
+}
+:root[data-theme='neubrutalism'] .kb-wiki .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: #ffeb3b;
+  border: 2px solid #000;
+  color: #000;
+}
+
+:root[data-theme='neubrutalism'] .kb-wiki .kb-row {
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0 #000;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fff;
+  transition: box-shadow 150ms, transform 150ms;
+}
+:root[data-theme='neubrutalism'] .kb-wiki .kb-row:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 #000;
+}
+:root[data-theme='neubrutalism'] .kb-wiki .kb-row-title {
+  font-weight: 800;
+  color: #000;
+}
+:root[data-theme='neubrutalism'] .kb-wiki .kb-row-summary {
+  padding-left: 0;
+  color: #222;
+}
+
+:root[data-theme='neubrutalism'] .kb-wiki .kb-section-title {
+  border-bottom: 3px solid #000;
+  font-weight: 800;
+}
+
+:root[data-theme='neubrutalism'] .kb-wiki .kb-page-title {
+  font-weight: 800;
+  color: #000;
+}
+
+:root[data-theme='neubrutalism'] .kb-wiki .ant-tag {
+  background: #4ecdc4;
+  color: #000;
+}
+
+/* ==================== Editorial / Magazine ==================== */
+
+:root[data-theme='editorial'] .kb-wiki {
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+:root[data-theme='editorial'] .kb-wiki .kb-sidebar {
+  border-right: 1px solid #000;
+}
+
+:root[data-theme='editorial'] .kb-wiki .ant-tree {
+  font-family: var(--theme-heading-font);
+  font-size: 13px;
+}
+:root[data-theme='editorial'] .kb-wiki .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: #f5f0ea;
+  color: #b03a2e;
+}
+
+:root[data-theme='editorial'] .kb-wiki .kb-page-title {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #111;
+  border-bottom: 3px double #000;
+  padding-bottom: 12px;
+}
+
+:root[data-theme='editorial'] .kb-wiki .kb-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: #000;
+  border-bottom: 1px solid #000;
+}
+
+:root[data-theme='editorial'] .kb-wiki .kb-row-title {
+  color: #111;
+  font-size: 17px;
+}
+:root[data-theme='editorial'] .kb-wiki .kb-row:hover .kb-row-title {
+  color: #b03a2e;
+}
+:root[data-theme='editorial'] .kb-wiki .kb-row-icon {
+  color: #b03a2e;
+}
+
+:root[data-theme='editorial'] .kb-wiki .kb-row-summary {
+  font-style: italic;
+  color: #444;
+}
+
+/* 条目正文：首字下沉，杂志排版 */
+:root[data-theme='editorial'] .kb-wiki .kb-entry-description::first-letter {
+  font-size: 3.2em;
+  font-weight: 700;
+  float: left;
+  line-height: 0.85;
+  padding-right: 8px;
+  color: #b03a2e;
+}
+
+:root[data-theme='editorial'] .kb-wiki .ant-tag {
+  font-family: var(--theme-heading-font);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+}
+
+:root[data-theme='editorial'] .kb-wiki .ant-breadcrumb {
+  font-family: var(--theme-heading-font);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+}

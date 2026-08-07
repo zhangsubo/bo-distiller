@@ -1,0 +1,182 @@
+/* 全站主题变量与覆盖：classic（默认）/ neubrutalism / editorial
+ * 作用域：<html data-theme="...">，由 appStore 写入
+ */
+
+:root {
+  --theme-accent: #1677ff;
+  --theme-border: #f0f0f0;
+  --theme-text-primary: #333;
+  --theme-text-body: #555;
+  --theme-text-secondary: #666;
+  --theme-text-muted: #999;
+  --theme-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --theme-heading-font: var(--theme-font);
+}
+
+/* 布局骨架（经典主题默认值，被各主题覆盖） */
+.app-header {
+  background: #fff;
+  border-bottom: 1px solid var(--theme-border);
+}
+.app-content {
+  background: #fff;
+  border-radius: 8px;
+}
+.app-logo {
+  color: #fff;
+}
+
+/* ==================== Neubrutalism ==================== */
+
+:root[data-theme='neubrutalism'] {
+  --theme-accent: #2196f3;
+  --theme-border: #000;
+  --theme-text-primary: #000;
+  --theme-text-body: #111;
+  --theme-text-secondary: #222;
+  --theme-text-muted: #444;
+  --theme-font: 'Helvetica Neue', Arial, sans-serif;
+  --theme-heading-font: 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+}
+
+:root[data-theme='neubrutalism'] .app-header {
+  border-bottom: 3px solid #000;
+}
+:root[data-theme='neubrutalism'] .app-content {
+  border: 3px solid #000;
+  border-radius: 0;
+  box-shadow: 6px 6px 0 #000;
+}
+
+/* Sider：纯黑底 + 黄色硬边选中 */
+:root[data-theme='neubrutalism'] .app-sider,
+:root[data-theme='neubrutalism'] .app-sider .ant-layout-sider-trigger {
+  background: #000;
+  border-right: 3px solid #000;
+}
+:root[data-theme='neubrutalism'] .app-sider .ant-menu {
+  background: #000;
+  font-weight: 700;
+}
+:root[data-theme='neubrutalism'] .app-sider .ant-menu-item,
+:root[data-theme='neubrutalism'] .app-sider .ant-menu-submenu-title {
+  border-radius: 0;
+}
+:root[data-theme='neubrutalism'] .app-sider .ant-menu-item-selected {
+  background: #ffeb3b;
+  color: #000;
+  border: 2px solid #000;
+  box-shadow: 3px 3px 0 #333;
+}
+:root[data-theme='neubrutalism'] .app-logo {
+  font-family: var(--theme-heading-font);
+  font-weight: 800;
+}
+
+:root[data-theme='neubrutalism'] .ant-card {
+  border: 2px solid #000;
+  border-radius: 0;
+  box-shadow: 4px 4px 0 #000;
+}
+:root[data-theme='neubrutalism'] .ant-btn {
+  border-radius: 0;
+  border-width: 2px;
+  border-color: #000;
+  font-weight: 700;
+}
+:root[data-theme='neubrutalism'] .ant-btn-primary {
+  box-shadow: 3px 3px 0 #000;
+}
+:root[data-theme='neubrutalism'] .ant-tag {
+  border: 2px solid #000;
+  border-radius: 0;
+  font-weight: 700;
+}
+:root[data-theme='neubrutalism'] .ant-input,
+:root[data-theme='neubrutalism'] .ant-input-affix-wrapper,
+:root[data-theme='neubrutalism'] .ant-select .ant-select-selector,
+:root[data-theme='neubrutalism'] .ant-segmented {
+  border: 2px solid #000;
+  border-radius: 0;
+}
+:root[data-theme='neubrutalism'] .ant-segmented-item-selected {
+  background: #ffeb3b;
+  color: #000;
+}
+:root[data-theme='neubrutalism'] .ant-table {
+  border: 2px solid #000;
+  border-radius: 0;
+}
+
+/* ==================== Editorial / Magazine ==================== */
+
+:root[data-theme='editorial'] {
+  --theme-accent: #b03a2e;
+  --theme-border: #d8d8d8;
+  --theme-text-primary: #111;
+  --theme-text-body: #222;
+  --theme-text-secondary: #444;
+  --theme-text-muted: #777;
+  --theme-font: Georgia, 'Times New Roman', 'Songti SC', serif;
+  --theme-heading-font: 'Helvetica Neue', 'PingFang SC', Arial, sans-serif;
+}
+
+:root[data-theme='editorial'] .app-header {
+  border-bottom: 1px solid #000;
+}
+:root[data-theme='editorial'] .app-content {
+  border-radius: 0;
+}
+
+/* Sider：米白纸感 + 砖红选中 */
+:root[data-theme='editorial'] .app-sider {
+  background: #f7f3ec;
+  border-right: 1px solid #000;
+}
+:root[data-theme='editorial'] .app-sider .ant-layout-sider-trigger {
+  background: #efe9dd;
+  color: #111;
+  border-top: 1px solid #000;
+}
+:root[data-theme='editorial'] .app-sider .ant-menu {
+  background: #f7f3ec;
+  font-family: var(--theme-heading-font);
+}
+:root[data-theme='editorial'] .app-sider .ant-menu-item {
+  border-radius: 0;
+}
+:root[data-theme='editorial'] .app-sider .ant-menu-item-selected {
+  background: #e9e1d2;
+  color: #b03a2e;
+  font-weight: 700;
+}
+:root[data-theme='editorial'] .app-logo {
+  color: #111;
+  font-family: var(--theme-heading-font);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+:root[data-theme='editorial'] .ant-card {
+  border-radius: 0;
+  border-color: #d8d8d8;
+  box-shadow: none;
+}
+:root[data-theme='editorial'] .ant-tag {
+  border-radius: 0;
+  border: 1px solid #000;
+  background: #fff;
+  color: #000;
+}
+:root[data-theme='editorial'] .ant-btn {
+  border-radius: 0;
+}
+
+/* 杂志风：标题统一走无衬线粗体 */
+:root[data-theme='editorial'] h1,
+:root[data-theme='editorial'] h2,
+:root[data-theme='editorial'] h3,
+:root[data-theme='editorial'] h4,
+:root[data-theme='editorial'] .ant-card-head-title {
+  font-family: var(--theme-heading-font);
+}

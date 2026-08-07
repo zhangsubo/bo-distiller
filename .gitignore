@@ -58,3 +58,4 @@ config.codekit3
 
 # 开发日志
 logs/
+.gstack/

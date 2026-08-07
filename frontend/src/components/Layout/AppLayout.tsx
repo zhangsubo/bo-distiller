@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Segmented } from 'antd';
 import {
   DatabaseOutlined,
   ImportOutlined,
@@ -8,7 +8,8 @@ import {
   BookOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { useAppStore } from '../../stores/appStore';
+import { useAppStore, THEME_OPTIONS } from '../../stores/appStore';
+import type { AppTheme } from '../../stores/appStore';
 
 const { Sider, Content, Header } = Layout;
 
@@ -33,6 +34,8 @@ const AppLayout: React.FC = () => {
   const location = useLocation();
   const collapsed = useAppStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const theme = useAppStore((s) => s.theme);
+  const setTheme = useAppStore((s) => s.setTheme);
 
   const selectedKey = allLeafKeys.find((key) =>
     location.pathname.startsWith(key),
@@ -40,23 +43,26 @@ const AppLayout: React.FC = () => {
 
   const openKeys = location.pathname.startsWith('/articles') ? ['input'] : [];
 
+  const menuTheme = theme === 'editorial' ? 'light' : 'dark';
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
         collapsible
         collapsed={collapsed}
         onCollapse={toggleSidebar}
-        theme="dark"
+        theme={menuTheme}
         width={200}
+        className="app-sider"
       >
         <div
+          className="app-logo"
           style={{
             height: 48,
             margin: 12,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#fff',
             fontWeight: 600,
             fontSize: collapsed ? 14 : 16,
             whiteSpace: 'nowrap',
@@ -66,7 +72,7 @@ const AppLayout: React.FC = () => {
           {collapsed ? 'BD' : 'Bo-Distiller'}
         </div>
         <Menu
-          theme="dark"
+          theme={menuTheme}
           mode="inline"
           selectedKeys={[selectedKey]}
           defaultOpenKeys={openKeys}
@@ -80,20 +86,28 @@ const AppLayout: React.FC = () => {
       </Sider>
       <Layout>
         <Header
+          className="app-header"
           style={{
             padding: '0 24px',
-            background: '#fff',
             display: 'flex',
             alignItems: 'center',
-            borderBottom: '1px solid #f0f0f0',
             height: 48,
           }}
         >
-          <span style={{ fontSize: 14, color: '#666' }}>
+          <span style={{ fontSize: 14, color: 'var(--theme-text-secondary)' }}>
             智能内容蒸馏工具
           </span>
+          <Segmented
+            style={{ marginLeft: 'auto' }}
+            options={THEME_OPTIONS}
+            value={theme}
+            onChange={(v) => setTheme(v as AppTheme)}
+          />
         </Header>
-        <Content style={{ margin: 16, padding: 24, background: '#fff', borderRadius: 8, overflow: 'auto' }}>
+        <Content
+          className="app-content"
+          style={{ margin: 16, padding: 24, overflow: 'auto' }}
+        >
           <Outlet />
         </Content>
       </Layout>

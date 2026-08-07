@@ -9,6 +9,7 @@ import { fetchKnowledgeTopic } from '../../api/knowledge';
 import type { KnowledgeEntry, KnowledgeTopicDetail } from '../../api/types';
 import { formatDate } from '../../utils/format';
 import MarkdownRenderer from '../../components/Markdown/MarkdownRenderer';
+import './knowledge.css';
 
 const ENTRY_SEP = '::';
 
@@ -117,28 +118,20 @@ const KnowledgePage: React.FC = () => {
 
   const renderHome = () => (
     <div>
-      <h2 style={{ marginTop: 0 }}>知识库</h2>
-      <p style={{ color: '#666' }}>
+      <h2 className="kb-page-title" style={{ marginTop: 0 }}>知识库</h2>
+      <p className="kb-text-secondary">
         共 {docs.length} 个主题、{docs.reduce((sum, d) => sum + (d.entry_count || 0), 0)} 个知识条目
       </p>
       {docs.map((doc) => (
-        <div
-          key={doc.name}
-          onClick={() => selectTopic(doc.name)}
-          style={{
-            padding: '12px 0',
-            borderBottom: '1px solid #f0f0f0',
-            cursor: 'pointer',
-          }}
-        >
+        <div key={doc.name} className="kb-row" onClick={() => selectTopic(doc.name)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <BookOutlined style={{ color: '#1677ff' }} />
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#1677ff' }}>
+            <BookOutlined className="kb-row-icon" />
+            <span className="kb-row-title" style={{ fontSize: 15 }}>
               {doc.title || doc.name}
             </span>
             <Tag>{doc.entry_count} 条目</Tag>
             {doc.modified && (
-              <span style={{ fontSize: 12, color: '#999', marginLeft: 'auto' }}>
+              <span className="kb-row-meta" style={{ marginLeft: 'auto' }}>
                 更新于 {formatDate(doc.modified)}
               </span>
             )}
@@ -155,14 +148,10 @@ const KnowledgePage: React.FC = () => {
       <div>
         <h3 style={{ marginTop: 0 }}>搜索「{searchQuery}」</h3>
         {results.map((r) => (
-          <div
-            key={r.name}
-            onClick={() => selectTopic(r.name)}
-            style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
-          >
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#1677ff' }}>{r.title || r.name}</span>
+          <div key={r.name} className="kb-row" onClick={() => selectTopic(r.name)}>
+            <span className="kb-row-title" style={{ fontSize: 15 }}>{r.title || r.name}</span>
             {r.snippet && (
-              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{r.snippet}</div>
+              <div className="kb-text-secondary" style={{ fontSize: 12, marginTop: 4 }}>{r.snippet}</div>
             )}
           </div>
         ))}
@@ -180,13 +169,15 @@ const KnowledgePage: React.FC = () => {
           { title: entry.title },
         ]}
       />
-      <h2 style={{ marginTop: 0 }}>{entry.title}</h2>
+      <h2 className="kb-page-title" style={{ marginTop: 0 }}>{entry.title}</h2>
       {entry.summary && (
-        <p style={{ fontSize: 15, color: '#333', fontWeight: 500 }}>{entry.summary}</p>
+        <p style={{ fontSize: 15, fontWeight: 500 }} className="kb-text-primary">{entry.summary}</p>
       )}
-      {entry.description && <p style={{ color: '#555', lineHeight: 1.8 }}>{entry.description}</p>}
+      {entry.description && (
+        <p className="kb-text-body kb-entry-description" style={{ lineHeight: 1.8 }}>{entry.description}</p>
+      )}
       {entry.official && entry.official !== '未提供' && !entry.official.startsWith('暂无') && (
-        <p style={{ color: '#555' }}>
+        <p className="kb-text-body">
           <strong>官方地址：</strong>
           {/^https?:\/\//.test(entry.official) ? (
             <a href={entry.official} target="_blank" rel="noreferrer">{entry.official}</a>
@@ -196,7 +187,7 @@ const KnowledgePage: React.FC = () => {
         </p>
       )}
       {entry.extra.map((f) => (
-        <p key={f.key} style={{ color: '#555' }}>
+        <p key={f.key} className="kb-text-body">
           <strong>{f.key}：</strong>
           {f.value}
         </p>
@@ -250,29 +241,27 @@ const KnowledgePage: React.FC = () => {
             { title: topicDetail.title || selectedTopic },
           ]}
         />
-        <h2 style={{ marginTop: 0, marginBottom: 4 }}>{topicDetail.title || selectedTopic}</h2>
+        <h2 className="kb-page-title" style={{ marginTop: 0, marginBottom: 4 }}>{topicDetail.title || selectedTopic}</h2>
         {topicDetail.summary && (
-          <p style={{ color: '#666', marginTop: 0 }}>
+          <p className="kb-text-secondary" style={{ marginTop: 0 }}>
             {topicDetail.summary} · 已提炼 {totalEntries} 个知识条目
           </p>
         )}
         {topicDetail.sections.map((section) => (
           <div key={section.title} style={{ marginTop: 24 }}>
-            <h3 style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: 8 }}>{section.title}</h3>
+            <h3 className="kb-section-title">{section.title}</h3>
             {section.entries.map((entry) => (
               <div
                 key={entry.id}
+                className="kb-row kb-row--entry"
                 onClick={() => setSelectedEntryId(entry.id)}
-                style={{ padding: '10px 0', borderBottom: '1px dashed #f5f5f5', cursor: 'pointer' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FileTextOutlined style={{ color: '#1677ff' }} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#1677ff' }}>{entry.title}</span>
+                  <FileTextOutlined className="kb-row-icon" />
+                  <span className="kb-row-title" style={{ fontSize: 14 }}>{entry.title}</span>
                 </div>
                 {entry.summary && (
-                  <div style={{ fontSize: 13, color: '#777', marginTop: 4, paddingLeft: 22 }}>
-                    {entry.summary}
-                  </div>
+                  <div className="kb-row-summary">{entry.summary}</div>
                 )}
               </div>
             ))}
@@ -296,13 +285,16 @@ const KnowledgePage: React.FC = () => {
       : [];
 
   return (
-    <div style={{ display: 'flex', gap: 0, height: 'calc(100vh - 128px)' }}>
+    <div
+      className="kb-wiki"
+      style={{ display: 'flex', gap: 0, height: 'calc(100vh - 128px)' }}
+    >
       {/* 左侧 wiki 导航树 */}
       <div
+        className="kb-sidebar"
         style={{
           width: 280,
           flexShrink: 0,
-          borderRight: '1px solid #f0f0f0',
           paddingRight: 12,
           marginRight: 24,
           display: 'flex',
