@@ -58,12 +58,9 @@ start_services() {
         echo -e "${YELLOW}⚠${NC} 未检测到虚拟环境 (venv)，使用系统 Python"
     fi
 
-    # 检查 Python 依赖
-    echo -e "${BLUE}→${NC} 检查 Python 依赖..."
-    if ! python -c "import uvicorn" 2>/dev/null; then
-        echo -e "${YELLOW}⚠${NC} 缺少依赖，正在安装..."
-        pip install -r requirements.txt
-    fi
+    # 同步 Python 依赖（pip 幂等，已装的包秒过）
+    echo -e "${BLUE}→${NC} 同步 Python 依赖..."
+    pip install -r requirements.txt -q 2>&1 | tail -1 || true
 
     # 检查前端依赖
     echo -e "${BLUE}→${NC} 检查前端依赖..."
