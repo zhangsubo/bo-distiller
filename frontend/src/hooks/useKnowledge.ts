@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchKnowledgeDocs, fetchKnowledgeDoc, searchKnowledge } from '../api/knowledge';
+import { fetchKnowledgeDocs, fetchKnowledgeDoc, fetchKnowledgeTopic, searchKnowledge } from '../api/knowledge';
 
 export function useKnowledgeDocs() {
   return useQuery({
@@ -12,6 +12,14 @@ export function useKnowledgeDoc(name: string | null) {
   return useQuery({
     queryKey: ['knowledgeDoc', name],
     queryFn: () => fetchKnowledgeDoc(name!),
+    enabled: !!name,
+  });
+}
+
+export function useKnowledgeTopic(name: string | null) {
+  return useQuery({
+    queryKey: ['knowledgeTopic', name],
+    queryFn: () => fetchKnowledgeTopic(name!),
     enabled: !!name,
   });
 }

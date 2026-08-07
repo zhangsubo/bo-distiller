@@ -8,7 +8,6 @@ const ArticleDetail = lazy(() => import('./pages/articles/ArticleDetail'));
 const SettingsPage = lazy(() => import('./pages/settings/index'));
 const DistillPage = lazy(() => import('./pages/distill/index'));
 const KnowledgePage = lazy(() => import('./pages/knowledge/index'));
-const KnowledgeViewer = lazy(() => import('./pages/knowledge/KnowledgeViewer'));
 
 const Loading = (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
@@ -27,7 +26,7 @@ const App: React.FC = () => {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/distill" element={<DistillPage />} />
           <Route path="/knowledge" element={<KnowledgePage />} />
-          <Route path="/knowledge/:name" element={<KnowledgeViewer />} />
+          <Route path="/knowledge/:name" element={<KnowledgePage />} />
         </Route>
       </Routes>
     </Suspense>

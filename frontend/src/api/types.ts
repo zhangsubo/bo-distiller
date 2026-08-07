@@ -64,6 +64,31 @@ export interface KnowledgeDocInfo {
   title: string;
   size: number;
   modified: string;
+  entry_count: number;
+}
+
+// 知识库 wiki 条目（主题下的具体文章条目）
+export interface KnowledgeEntry {
+  id: string;
+  title: string;
+  summary: string;
+  description: string;
+  official: string;
+  articles: Array<{ title: string; url: string }>;
+  extra: Array<{ key: string; value: string }>;
+}
+
+export interface KnowledgeSection {
+  title: string;
+  entries: KnowledgeEntry[];
+}
+
+export interface KnowledgeTopicDetail {
+  name: string;
+  title: string;
+  summary: string;
+  sections: KnowledgeSection[];
+  raw: string;
 }
 
 // 蒸馏状态

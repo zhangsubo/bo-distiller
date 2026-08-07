@@ -79,9 +79,9 @@ start_services() {
     # 创建日志目录
     mkdir -p "$LOGS_DIR"
 
-    # 启动后端
+    # 启动后端（--reload：改动 .py 文件后自动重启，仅开发用；生产请用 python web_ui.py）
     echo -e "\n${GREEN}启动后端服务...${NC}"
-    BACKEND_PORT=$BACKEND_PORT python "$PROJECT_DIR/web_ui.py" > "$LOGS_DIR/backend.log" 2>&1 &
+    BACKEND_PORT=$BACKEND_PORT python -m uvicorn src.web.app:create_app --factory --reload --host 127.0.0.1 --port $BACKEND_PORT > "$LOGS_DIR/backend.log" 2>&1 &
     BACKEND_PID=$!
     echo -e "${GREEN}✓${NC} 后端已启动 (PID: $BACKEND_PID)"
     echo -e "  后端地址: ${BLUE}http://127.0.0.1:${BACKEND_PORT}${NC}"
@@ -165,6 +165,7 @@ stop_services() {
     # 确保清理所有相关进程
     echo -e "\n${BLUE}→${NC} 清理残留进程..."
     pkill -f "web_ui.py" 2>/dev/null && echo -e "${GREEN}✓${NC} 清理了后端残留进程" || true
+    pkill -f "src.web.app:create_app" 2>/dev/null && echo -e "${GREEN}✓${NC} 清理了后端残留进程" || true
     pkill -f "vite" 2>/dev/null && echo -e "${GREEN}✓${NC} 清理了前端残留进程" || true
 
     echo -e "\n${GREEN}✓ 所有服务已停止${NC}\n"
