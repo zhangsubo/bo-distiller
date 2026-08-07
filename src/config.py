@@ -67,18 +67,27 @@ class ConfigManager:
         if raw_config is None:
             raw_config = self._migrate_yaml_to_db(db_key, config_file)
         if not raw_config:
+            # 配置不存在：首次运行，使用默认值
             return SystemConfig()
-        try:
-            raw_config = self._substitute_env_vars(raw_config)
-            config = self._parse_system_config(raw_config)
-            self._validate_config(config)
-            self._config_cache["system"] = config
-            return config
-        except Exception as e:
-            console.print(f"[red]配置加载失败: {e}[/red]")
-            return SystemConfig()
+        # 配置已存在但解析失败：报错而非静默回退
+        raw_config = self._substitute_env_vars(raw_config)
+        config = self._parse_system_config(raw_config)
+        self._validate_config(config)
+        self._config_cache["system"] = config
+        return config
 
     def save_config(self, config: Dict) -> None:
+        """保存系统配置（先验证再写入）
+
+        Raises:
+            ValueError: 配置验证失败
+        """
+        # 验证：解析 + 完整性校验
+        try:
+            parsed = self._parse_system_config(config)
+            self._validate_config(parsed)
+        except Exception as e:
+            raise ValueError(f"配置验证失败: {e}") from e
         self._storage.set_setting(SETTING_KEYS["system"], config)
         self._config_cache.pop("system", None)
 

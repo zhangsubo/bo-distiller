@@ -3,8 +3,8 @@ import { Form, Switch, InputNumber, Button, Descriptions, Space, message, Spin, 
 import { SyncOutlined, StopOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useSyncStatus as useSystemSyncConfig, useSaveSyncConfig } from '../../hooks/useSystemSettings';
-import { useSyncStatus } from '../../hooks/useArticles';
+import { useSyncConfig, useSaveSyncConfig } from '../../hooks/useSystemSettings';
+import { useSyncRuntime } from '../../hooks/useArticles';
 import { syncCubox, cancelSyncCubox } from '../../api/articles';
 
 function formatTime(value: string | null | undefined): string {
@@ -16,18 +16,17 @@ function formatTime(value: string | null | undefined): string {
 const SyncSettings: React.FC = () => {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useSystemSyncConfig();
+  const { data, isLoading } = useSyncConfig();
   const saveMutation = useSaveSyncConfig();
 
-  // 监控同步状态
-  const { data: syncStatus } = useSyncStatus(true);
+  // 监控同步运行状态（独立 key，不与配置混淆）
+  const { data: syncStatus } = useSyncRuntime(true);
 
   const syncNowMutation = useMutation({
     mutationFn: (incremental: boolean) => syncCubox(incremental),
     onSuccess: (res) => {
       message.success(res?.message || '同步任务已启动');
-      // 立即刷新同步状态
-      queryClient.invalidateQueries({ queryKey: ['syncStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['sync', 'runtime'] });
     },
     onError: (error: any) => {
       message.error(error?.message || '同步失败');
@@ -38,8 +37,7 @@ const SyncSettings: React.FC = () => {
     mutationFn: cancelSyncCubox,
     onSuccess: (res) => {
       message.info(res?.message || '正在取消同步...');
-      // 立即刷新同步状态
-      queryClient.invalidateQueries({ queryKey: ['syncStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['sync', 'runtime'] });
     },
     onError: (error: any) => {
       message.error(error?.message || '取消失败');

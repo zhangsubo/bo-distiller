@@ -1,21 +1,17 @@
 """
 系统状态 API
 
-从 web_ui.py 平移而来，保持原有端点行为不变
+通过 TaskManager 获取真实蒸馏状态
 """
 
 from pathlib import Path
 
 from fastapi import APIRouter
 
-# 注意：必须按模块访问 _distill_status，因为 start_distill 会整体重新赋值该字典，
-# 直接 from 导入会持有旧对象的引用
-from src.web.routers import distill as distill_router
+from src.web.tasks import get_task_manager, TaskStatus
 
 router = APIRouter()
 
-
-# ==================== 系统状态 API ====================
 
 @router.get("/api/status")
 async def get_status():
@@ -33,8 +29,12 @@ async def get_status():
 
     output_count = len(list(output_dir.glob("*.md"))) if output_dir.exists() else 0
 
+    # 从 TaskManager 获取真实状态
+    task = get_task_manager().get_current_task()
+    is_running = task is not None and task.status == TaskStatus.RUNNING
+
     return {
         "cache": cache_info,
         "output_documents": output_count,
-        "status": "idle" if not distill_router._distill_status["running"] else "running",
+        "status": "running" if is_running else "idle",
     }

@@ -20,6 +20,7 @@ console = Console()
 
 # LLM 元数据 API (使用 models.dev，避免 AGPL 协议风险)
 LLM_METADATA_API_URL = "https://models.dev/api.json"
+PROVIDERS_SETTING_KEY = "llm_providers"
 
 # 支持的提供商 ID
 SUPPORTED_PROVIDERS = [
@@ -39,6 +40,30 @@ class LLMMetadataManager:
     def __init__(self):
         self.storage = get_storage()
         self.cache_duration = timedelta(days=30)  # 缓存 30 天（1 个月）
+
+    def get_supported_providers(self) -> List[str]:
+        """从数据库获取提供商列表，首次使用时写入默认列表。"""
+        stored = self.storage.get_setting(PROVIDERS_SETTING_KEY)
+        providers = stored.get("providers") if isinstance(stored, dict) else None
+        if not isinstance(providers, list):
+            providers = list(SUPPORTED_PROVIDERS)
+            self._save_supported_providers(providers)
+        return list(dict.fromkeys(p for p in providers if isinstance(p, str) and p))
+
+    def _save_supported_providers(self, providers: List[str]) -> None:
+        self.storage.set_setting(PROVIDERS_SETTING_KEY, {"providers": providers})
+
+    def add_supported_provider(self, provider_id: str) -> None:
+        providers = self.get_supported_providers()
+        if provider_id not in providers:
+            providers.append(provider_id)
+            self._save_supported_providers(providers)
+
+    def remove_supported_provider(self, provider_id: str) -> None:
+        providers = self.get_supported_providers()
+        if provider_id in providers:
+            providers.remove(provider_id)
+            self._save_supported_providers(providers)
 
     def _get_cache_key(self, provider_id: str, data_type: str) -> str:
         """生成缓存键"""
@@ -293,7 +318,7 @@ class LLMMetadataManager:
         """
         results = {}
 
-        for provider_id in SUPPORTED_PROVIDERS:
+        for provider_id in self.get_supported_providers():
             metadata = await self.get_or_fetch_provider_metadata(
                 provider_id, force_refresh=True
             )
@@ -315,7 +340,7 @@ class LLMMetadataManager:
             console.print(f"[green]✓ 已清除 {provider_id} 缓存[/green]")
         else:
             # 清除所有提供商
-            for pid in SUPPORTED_PROVIDERS:
+            for pid in self.get_supported_providers():
                 self.clear_cache(pid)
             console.print("[green]✓ 已清除所有提供商缓存[/green]")
 

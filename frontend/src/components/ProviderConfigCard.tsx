@@ -28,17 +28,20 @@ const ProviderConfigCard: React.FC<ProviderConfigCardProps> = ({
   // 测试连通性
   const handleTestConnectivity = async () => {
     try {
-      // 获取当前表单值
       const providerConfig = form.getFieldValue(['providers', providerId]) || {};
-      const { api_key, api_base, model } = providerConfig;
+      let { api_key, api_base, model } = providerConfig;
 
-      // 验证必填字段
-      if (!api_key || !api_base || !model) {
-        message.warning('请先填写 API Key、Base URL 和模型');
+      if (!api_base || !model) {
+        message.warning('请先填写 Base URL 和模型');
         return;
       }
 
-      // 调用测试接口
+      // 掩码占位符不是真实 Key，不发送给后端（后端会从 DB 读取）
+      const KEY_PLACEHOLDER = '***已配置***';
+      if (!api_key || api_key === KEY_PLACEHOLDER) {
+        api_key = '';
+      }
+
       const result = await testConnectivityMutation.mutateAsync({
         apiKey: api_key,
         apiBase: api_base,

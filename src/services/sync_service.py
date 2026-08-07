@@ -76,9 +76,9 @@ def _update_sync_status(running: bool = None, progress: str = None,
 
 
 def _do_sync(incremental: bool = False):
-    """执行实际的同步操作（后台线程）"""
+    """执行实际的同步操作（由 _do_sync_wrapper 或 run_sync(background=False) 调用）"""
     try:
-        _update_sync_status(running=True, progress="初始化...", total=0, processed=0, error=None)
+        _update_sync_status(progress="初始化...", total=0, processed=0, error=None)
 
         from src.adapters.cubox_adapter import CuboxAdapter
         from src.models import SourceConfig
@@ -113,7 +113,6 @@ def _do_sync(incremental: bool = False):
             articles = adapter.fetch(source_config)
 
         _update_sync_status(
-            running=False,
             progress=f"同步完成，获取 {len(articles)} 篇文章",
             total=len(articles),
             processed=len(articles),
@@ -121,13 +120,13 @@ def _do_sync(incremental: bool = False):
         )
 
     except InterruptedError as e:
-        # 用户取消
-        _update_sync_status(running=False, error=str(e))
+        # 用户取消（running 由调用方恢复）
+        _update_sync_status(error=str(e))
         console.print(f"[yellow]同步已取消[/yellow]")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        _update_sync_status(running=False, error=str(e))
+        _update_sync_status(error=str(e))
         console.print(f"[red]同步失败: {e}[/red]")
 
 
@@ -153,21 +152,28 @@ def run_sync(incremental: bool = False, background: bool = True) -> dict:
     Raises:
         ValueError: Cubox CLI 不可用或已有同步任务运行中
     """
+    # 原子操作：在同一锁区间内检查 + 设置 running，消除并发空窗
     with _sync_lock:
         if _sync_status["running"]:
             raise ValueError("已有同步任务正在运行")
+        _sync_status["running"] = True
+        _sync_status["should_cancel"] = False
+        _sync_status["error"] = None
+        _sync_status["progress"] = "初始化..."
 
     if background:
-        # 启动后台线程
-        thread = threading.Thread(target=_do_sync, args=(incremental,), daemon=True)
+        thread = threading.Thread(target=_do_sync_wrapper, args=(incremental,), daemon=True)
         thread.start()
         return {
             "status": "started",
             "message": "同步任务已启动，请查询同步状态",
         }
     else:
-        # 同步执行（用于定时任务）
-        _do_sync(incremental)
+        try:
+            _do_sync(incremental)
+        finally:
+            with _sync_lock:
+                _sync_status["running"] = False
         status = get_sync_status()
         if status["error"]:
             raise Exception(status["error"])
@@ -176,6 +182,15 @@ def run_sync(incremental: bool = False, background: bool = True) -> dict:
             "message": status["progress"],
             "count": status["total"],
         }
+
+
+def _do_sync_wrapper(incremental: bool):
+    """后台线程包装器，确保 running 状态最终恢复"""
+    try:
+        _do_sync(incremental)
+    finally:
+        with _sync_lock:
+            _sync_status["running"] = False
 
 
 def backfill_content(limit: int = 0) -> dict:

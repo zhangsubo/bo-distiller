@@ -5,6 +5,7 @@ Bo-Distiller 知识合成模块
 """
 
 import asyncio
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -22,6 +23,11 @@ from .utils import count_tokens, format_articles_for_prompt, replace_article_ref
 console = Console()
 
 
+class DistillationCancelled(Exception):
+    """蒸馏取消信号异常（从 orchestrator 层复用）"""
+    pass
+
+
 class KnowledgeSynthesizer:
     """知识合成器 - 核心模块
 
@@ -35,10 +41,12 @@ class KnowledgeSynthesizer:
         llm_client: Optional[LLMClient] = None,
         cache_manager: Optional[CacheManager] = None,
         config_manager: Optional[ConfigManager] = None,
+        cancel_event: Optional[threading.Event] = None,
     ):
         self.llm = llm_client or get_llm_client()
         self.cache = cache_manager or CacheManager()
         self.config_manager = config_manager or get_config_manager()
+        self._cancel_event = cancel_event
 
         self.config = self.config_manager.load_config()
         self.prompts = self.config_manager.load_prompts()
@@ -56,11 +64,13 @@ class KnowledgeSynthesizer:
         self.safety_margin = self.config.processing.safety_margin
         self.max_article_length = self.config.processing.max_article_length
 
-    def count_tokens(self, text: str) -> int:
-        """统计文本的 token 数量
+    def check_cancelled(self):
+        """在关键点调用：如果已取消则抛出异常"""
+        if self._cancel_event and self._cancel_event.is_set():
+            raise DistillationCancelled("蒸馏任务已被用户取消")
 
-        使用 LLMClient 的 tokenizer
-        """
+    def count_tokens(self, text: str) -> int:
+        """统计文本的 token 数量"""
         return self.llm.count_tokens(text)
 
     def create_batches(self, articles: List[Article]) -> List[List[Article]]:
@@ -127,7 +137,8 @@ class KnowledgeSynthesizer:
             },
         ]
 
-        # 带重试的 API 调用
+        # LLM 调用前检查取消
+        self.check_cancelled()
         batch_temp = self.config.processing.batch_temperature
         return self.llm.chat(
             messages=messages,
@@ -178,9 +189,10 @@ class KnowledgeSynthesizer:
             task = progress.add_task("合成中...", total=len(batches))
 
             for i, batch in enumerate(batches):
-                # 检查缓存
+                # 检查缓存（使用指纹）
+                fp = self._get_batch_fingerprint(topic, i, batch)
                 if i in completed_batches:
-                    cached = self.cache.load_batch_result(topic, i)
+                    cached = self.cache.load_batch_result(topic, i, fingerprint=fp)
                     if cached:
                         batch_insights.append(cached)
                         progress.update(
@@ -198,8 +210,8 @@ class KnowledgeSynthesizer:
                     insight = self.extract_batch_insights(batch, topic)
                     batch_insights.append(insight)
 
-                    # 保存批次结果
-                    self.cache.save_batch_result(topic, i, insight)
+                    # 保存批次结果（使用指纹）
+                    self.cache.save_batch_result(topic, i, insight, fingerprint=fp)
 
                 except Exception as e:
                     console.print(f"\n[red]批次 {i + 1} 处理失败: {e}[/red]")
@@ -231,7 +243,8 @@ class KnowledgeSynthesizer:
 
         for i, batch in enumerate(batches):
             if i in completed_batches:
-                cached = self.cache.load_batch_result(topic, i)
+                fp = self._get_batch_fingerprint(topic, i, batch)
+                cached = self.cache.load_batch_result(topic, i, fingerprint=fp)
                 if cached:
                     batch_insights[i] = cached
                     console.print(f"[green]批次 {i + 1}/{len(batches)} (使用缓存)[/green]")
@@ -253,8 +266,9 @@ class KnowledgeSynthesizer:
                     try:
                         _, insight = await self.extract_batch_insights_async(batch, topic, batch_index)
 
-                        # 保存批次结果
-                        self.cache.save_batch_result(topic, batch_index, insight)
+                        # 保存批次结果（使用指纹）
+                        fp = self._get_batch_fingerprint(topic, batch_index, batch)
+                        self.cache.save_batch_result(topic, batch_index, insight, fingerprint=fp)
                         batch_insights[batch_index] = insight
 
                         console.print(f"[green]✓ 完成批次 {batch_index + 1}/{len(batches)}[/green]")
@@ -320,7 +334,8 @@ class KnowledgeSynthesizer:
             {"role": "user", "content": final_prompt},
         ]
 
-        # 带重试的最终整合
+        # LLM 调用前检查取消
+        self.check_cancelled()
         synthesis_temp = self.config.processing.synthesis_temperature
         return self.llm.chat(
             messages=messages,
@@ -328,16 +343,57 @@ class KnowledgeSynthesizer:
             max_tokens=self.max_output,
         )
 
+    def _get_provider_id(self) -> str:
+        """获取实际使用的 provider_id（从 llm_client 推断）"""
+        return getattr(self.llm, "provider", self.config.llm.default_provider)
+
+    def _get_batch_fingerprint(self, topic: str, batch_idx: int, articles: List[Article]) -> str:
+        """计算批次指纹：包含实际 prompt 内容和 provider"""
+        prompt_key = self.topic_prompt_keys.get(topic, "general")
+        prompt_template = self.prompts.get(prompt_key) if prompt_key else None
+        prompt_template = prompt_template or self.prompts.get(topic) or self.prompts.get("general")
+        prompt_content = prompt_template.system if prompt_template else ""
+        provider_id = self._get_provider_id()
+        provider_cfg = self.config.llm.providers.get(provider_id, {})
+        return self.cache._batch_fingerprint(
+            topic=topic,
+            batch_idx=batch_idx,
+            articles=articles,
+            prompt_key=prompt_content,  # 用实际 prompt 内容，不只是 key
+            provider_id=provider_id,
+            model=getattr(provider_cfg, "model", ""),
+            temperature=self.config.processing.batch_temperature,
+            max_tokens=self.max_output,
+        )
+
+    def _get_final_fingerprint(self, topic: str, batch_results: List[str]) -> str:
+        """计算最终文档指纹：包含实际 prompt 内容和 provider"""
+        synthesis_prompt = self.prompts.get("synthesis")
+        prompt_content = synthesis_prompt.system if synthesis_prompt else ""
+        provider_id = self._get_provider_id()
+        provider_cfg = self.config.llm.providers.get(provider_id, {})
+        return self.cache._final_fingerprint(
+            topic=topic,
+            batch_results=batch_results,
+            prompt_key=prompt_content,  # 用实际 prompt 内容，不只是 key
+            provider_id=provider_id,
+            model=getattr(provider_cfg, "model", ""),
+            temperature=self.config.processing.synthesis_temperature,
+            max_tokens=self.max_output,
+        )
+
     def distill_topic(
         self,
         articles: List[Article],
         topic: str,
+        incremental: bool = True,
     ) -> str:
         """蒸馏单个主题（两阶段合成）
 
         Args:
             articles: 该主题的所有文章
             topic: 主题名称
+            incremental: 是否使用缓存（False 时跳过所有派生缓存）
 
         Returns:
             合成后的知识文档内容（带文章引用和链接）
@@ -345,11 +401,13 @@ class KnowledgeSynthesizer:
         if not articles:
             return ""
 
-        # 检查是否有缓存的最终结果
-        cached_final = self.cache.load_final_doc(topic)
-        if cached_final:
-            console.print(f"[green]>> 使用缓存：【{topic}】已完成合成[/green]\n")
-            return replace_article_refs(cached_final, articles)
+        # incremental=False 时跳过 final 缓存
+        if incremental:
+            cached_final = self.cache.load_final_doc(topic)
+            if cached_final:
+                console.print(f"[green]>> 使用缓存：【{topic}】已完成合成[/green]\n")
+                return replace_article_refs(cached_final, articles)
+
 
         console.print(f"\n[bold cyan]正在合成【{topic}】知识体系...[/bold cyan]")
         console.print(f"[yellow]共 {len(articles)} 篇文章[/yellow]\n")
@@ -361,10 +419,15 @@ class KnowledgeSynthesizer:
             console.print(f"  - 批次 {i}: {len(batch)} 篇文章")
         console.print()
 
-        # 检查已完成的批次
-        completed_batches = self.cache.get_completed_batches(topic, len(batches))
-        if completed_batches:
-            console.print(f"[yellow]>> 发现已完成的批次: {completed_batches}[/yellow]")
+        # 检查已完成的批次（使用指纹）
+        completed_batches = []
+        if incremental:
+            for i in range(len(batches)):
+                fp = self._get_batch_fingerprint(topic, i, batches[i])
+                if self.cache.load_batch_result(topic, i, fingerprint=fp):
+                    completed_batches.append(i)
+            if completed_batches:
+                console.print(f"[yellow]>> 发现已完成的批次: {completed_batches}[/yellow]")
 
         # 处理每一批（支持并发）
         batch_insights = self._process_batches_concurrent(
@@ -377,7 +440,10 @@ class KnowledgeSynthesizer:
 
         final_doc_with_links = replace_article_refs(final_doc, articles)
 
-        # 保存最终结果（保存带链接的版本）
+        # 写入前检查取消
+        self.check_cancelled()
+
+        # 保存最终结果（使用 topic hash 作文件名，与 load_final_doc 一致）
         self.cache.save_final_doc(topic, final_doc_with_links)
 
         console.print(f"[green]>> 完成【{topic}】知识合成[/green]\n")
@@ -386,11 +452,13 @@ class KnowledgeSynthesizer:
     def distill_all(
         self,
         topics: Dict[str, List[Article]],
+        incremental: bool = True,
     ) -> Dict[str, KnowledgeDoc]:
         """蒸馏所有主题
 
         Args:
             topics: 按主题组织的文章字典
+            incremental: 是否使用缓存
 
         Returns:
             每个主题的知识文档
@@ -401,7 +469,7 @@ class KnowledgeSynthesizer:
             if not articles:
                 continue
 
-            content = self.distill_topic(articles, topic)
+            content = self.distill_topic(articles, topic, incremental=incremental)
 
             results[topic] = KnowledgeDoc(
                 topic=topic,

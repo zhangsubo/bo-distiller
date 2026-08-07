@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Card, Select, Radio, Button, Space, message, Input } from 'antd';
+import { Card, Radio, Button, Space, message, Input } from 'antd';
 import { PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
 import { useDistillStatus, useStartDistill, useStopDistill } from '../../hooks/useDistillProgress';
 import { useConfig } from '../../hooks/useConfig';
-import { LLM_MODELS } from '../../utils/constants';
 
 const DistillControls: React.FC = () => {
   const [incremental, setIncremental] = useState(true);

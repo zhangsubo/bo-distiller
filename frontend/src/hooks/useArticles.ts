@@ -51,13 +51,12 @@ export function useSyncCubox() {
   });
 }
 
-export function useSyncStatus(enabled: boolean = true) {
+export function useSyncRuntime(enabled: boolean = true) {
   return useQuery({
-    queryKey: ['syncStatus'],
+    queryKey: ['sync', 'runtime'],
     queryFn: getSyncStatus,
     enabled,
     refetchInterval: (query) => {
-      // 如果正在同步，每2秒轮询一次
       const data = query.state.data as any;
       return data?.running ? 2000 : false;
     },

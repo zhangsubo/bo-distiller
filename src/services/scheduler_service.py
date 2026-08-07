@@ -23,12 +23,12 @@ _scheduler: Optional[BackgroundScheduler] = None
 
 
 def _run_scheduled_sync():
-    """定时任务入口：按当前配置执行同步"""
+    """定时任务入口：按当前配置同步执行（不使用后台线程）"""
     from src.services.sync_service import run_sync
 
     try:
         sync_config = get_config_manager().load_config().sync
-        result = run_sync(incremental=sync_config.incremental)
+        result = run_sync(incremental=sync_config.incremental, background=False)
         console.print(f"[green]定时同步完成: {result.get('message')}[/green]")
     except Exception as e:
         console.print(f"[red]定时同步失败: {e}[/red]")

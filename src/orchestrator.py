@@ -1,5 +1,6 @@
+import threading
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from rich.console import Console
 
@@ -19,6 +20,7 @@ def run_distillation(
     incremental: bool = True,
     limit: Optional[int] = None,
     console: Optional[Console] = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> None:
     console = console or Console()
     config = config_manager.load_config()
@@ -41,18 +43,21 @@ def run_distillation(
         articles = articles[:limit]
 
     console.print("[bold]步骤 2/4: 清洗文章内容[/bold]")
-    cleaned = cache.load_cleaned() if incremental else None
+    # incremental=False 时跳过缓存，强制重新清洗
+    cleaned = cache.load_cleaned(articles=articles) if incremental else None
     if not cleaned:
         cleaner = ContentCleaner()
         cleaned = cleaner.clean_batch(articles)
-        cache.save_cleaned(cleaned)
+        cache.save_cleaned_with_fingerprint(cleaned, articles)
 
     console.print("[bold]步骤 3/4: 主题分类[/bold]")
-    topics = cache.load_topics() if incremental else None
+    topics_config = config_manager.load_topics()
+    # incremental=False 时跳过缓存，强制重新分类
+    topics = cache.load_topics(cleaned=cleaned, topics_config=topics_config) if incremental else None
     if not topics:
         classifier = TopicClassifier(config_manager)
         topics = classifier.classify_batch(cleaned)
-        cache.save_topics(topics)
+        cache.save_topics_with_fingerprint(topics, cleaned, topics_config)
 
     console.print(f"[bold]步骤 4/4: AI 知识合成（使用 {model}）[/bold]")
     llm = get_llm_client(provider=model, config_manager=config_manager)
@@ -60,8 +65,9 @@ def run_distillation(
         llm_client=llm,
         cache_manager=cache,
         config_manager=config_manager,
+        cancel_event=cancel_event,
     )
-    results = synthesizer.distill_all(topics)
+    results = synthesizer.distill_all(topics, incremental=incremental)
 
     console.print("[bold]生成最终文档[/bold]")
     output_dir = Path(config.output.local_dir)

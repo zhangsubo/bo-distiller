@@ -52,18 +52,13 @@ export async function getProviderMetadata(
 }
 
 /**
- * 获取提供商模型列表
+ * 获取提供商模型列表（API Key 由后端从 system_config 读取，不通过 URL 传递）
  */
 export async function getProviderModels(
   providerId: string,
-  apiBase?: string,
-  apiKey?: string,
   forceRefresh = false
 ): Promise<ProviderModel[]> {
-  let url = `${API_BASE}/api/llm/providers/${providerId}/models?force_refresh=${forceRefresh}`;
-  if (apiBase) url += `&api_base=${encodeURIComponent(apiBase)}`;
-  if (apiKey) url += `&api_key=${encodeURIComponent(apiKey)}`;
-
+  const url = `${API_BASE}/api/llm/providers/${providerId}/models?force_refresh=${forceRefresh}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`获取 ${providerId} 模型列表失败`);
   const result = await response.json();

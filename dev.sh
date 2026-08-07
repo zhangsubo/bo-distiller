@@ -16,9 +16,31 @@ NC='\033[0m' # No Color
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGS_DIR="$PROJECT_DIR/logs"
 
-# 加载 .env 配置
+# 加载 .env 配置（安全方式：逐行解析，正确处理引号和值中的 =）
 if [ -f "$PROJECT_DIR/.env" ]; then
-    export $(grep -v '^#' "$PROJECT_DIR/.env" | grep -v '^$' | xargs)
+    while IFS= read -r line || [ -n "$line" ]; do
+        # 跳过注释和空行
+        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line// }" ]] && continue
+        # 去除行首尾空白
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        # 提取 key（第一个 = 之前）
+        key="${line%%=*}"
+        # 提取 value（第一个 = 之后的全部内容）
+        value="${line#*=}"
+        # 去除 key 的空白
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        # 去除值两端的引号
+        if [[ "$value" =~ ^\".*\"$ ]] || [[ "$value" =~ ^\'.*\'$ ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+        # 去除值首尾空白
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        export "$key=$value"
+    done < "$PROJECT_DIR/.env"
     echo -e "${GREEN}✓${NC} 已加载 .env 配置"
 fi
 
@@ -42,12 +64,19 @@ start_services() {
     echo -e "${BLUE}  Bo-Distiller 启动服务${NC}"
     echo -e "${BLUE}================================${NC}\n"
 
-    # 检查服务是否已在运行
+    # 检查服务是否已在运行，已运行则阻止重复启动
+    ALREADY_RUNNING=false
     if [ -f "$LOGS_DIR/backend.pid" ] && ps -p $(cat "$LOGS_DIR/backend.pid") > /dev/null 2>&1; then
-        echo -e "${YELLOW}⚠${NC} 后端服务已在运行"
+        echo -e "${YELLOW}⚠${NC} 后端服务已在运行 (PID: $(cat "$LOGS_DIR/backend.pid"))"
+        ALREADY_RUNNING=true
     fi
     if [ -f "$LOGS_DIR/frontend.pid" ] && ps -p $(cat "$LOGS_DIR/frontend.pid") > /dev/null 2>&1; then
-        echo -e "${YELLOW}⚠${NC} 前端服务已在运行"
+        echo -e "${YELLOW}⚠${NC} 前端服务已在运行 (PID: $(cat "$LOGS_DIR/frontend.pid"))"
+        ALREADY_RUNNING=true
+    fi
+    if [ "$ALREADY_RUNNING" = true ]; then
+        echo -e "\n${RED}服务已在运行，请先执行 ./dev.sh stop${NC}"
+        exit 1
     fi
 
     # 检查并激活 Python 虚拟环境
@@ -124,19 +153,37 @@ start_services() {
     echo ""
 }
 
+# 验证 PID 是否属于当前项目（检查命令行或工作目录）
+_pid_is_mine() {
+    local pid=$1
+    local keyword=$2
+    # 检查进程命令行是否包含项目关键字
+    if ps -p "$pid" -o command= 2>/dev/null | grep -q "$keyword"; then
+        return 0
+    fi
+    # 检查进程工作目录是否在项目内
+    local cwd
+    cwd=$(lsof -p "$pid" 2>/dev/null | awk '/cwd/ {print $NF}')
+    if [ "$cwd" = "$PROJECT_DIR" ]; then
+        return 0
+    fi
+    return 1
+}
+
 # 停止服务
 stop_services() {
     echo -e "${BLUE}================================${NC}"
     echo -e "${BLUE}  Bo-Distiller 停止服务${NC}"
     echo -e "${BLUE}================================${NC}\n"
 
-    # 从 PID 文件读取并停止服务
     if [ -f "$LOGS_DIR/backend.pid" ]; then
         BACKEND_PID=$(cat "$LOGS_DIR/backend.pid")
-        if ps -p $BACKEND_PID > /dev/null 2>&1; then
+        if ps -p $BACKEND_PID > /dev/null 2>&1 && _pid_is_mine "$BACKEND_PID" "web_ui.py"; then
             echo -e "${BLUE}→${NC} 停止后端服务 (PID: $BACKEND_PID)..."
             kill $BACKEND_PID
             echo -e "${GREEN}✓${NC} 后端服务已停止"
+        elif ps -p $BACKEND_PID > /dev/null 2>&1; then
+            echo -e "${YELLOW}⚠${NC} PID $BACKEND_PID 存在但不属于本项目，跳过"
         else
             echo -e "${YELLOW}⚠${NC} 后端服务未运行 (PID: $BACKEND_PID)"
         fi
@@ -147,10 +194,12 @@ stop_services() {
 
     if [ -f "$LOGS_DIR/frontend.pid" ]; then
         FRONTEND_PID=$(cat "$LOGS_DIR/frontend.pid")
-        if ps -p $FRONTEND_PID > /dev/null 2>&1; then
+        if ps -p $FRONTEND_PID > /dev/null 2>&1 && _pid_is_mine "$FRONTEND_PID" "vite"; then
             echo -e "${BLUE}→${NC} 停止前端服务 (PID: $FRONTEND_PID)..."
             kill $FRONTEND_PID
             echo -e "${GREEN}✓${NC} 前端服务已停止"
+        elif ps -p $FRONTEND_PID > /dev/null 2>&1; then
+            echo -e "${YELLOW}⚠${NC} PID $FRONTEND_PID 存在但不属于本项目，跳过"
         else
             echo -e "${YELLOW}⚠${NC} 前端服务未运行 (PID: $FRONTEND_PID)"
         fi
@@ -159,13 +208,7 @@ stop_services() {
         echo -e "${YELLOW}⚠${NC} 未找到前端 PID 文件"
     fi
 
-    # 确保清理所有相关进程
-    echo -e "\n${BLUE}→${NC} 清理残留进程..."
-    pkill -f "web_ui.py" 2>/dev/null && echo -e "${GREEN}✓${NC} 清理了后端残留进程" || true
-    pkill -f "src.web.app:create_app" 2>/dev/null && echo -e "${GREEN}✓${NC} 清理了后端残留进程" || true
-    pkill -f "vite" 2>/dev/null && echo -e "${GREEN}✓${NC} 清理了前端残留进程" || true
-
-    echo -e "\n${GREEN}✓ 所有服务已停止${NC}\n"
+    echo -e "\n${GREEN}✓ PID 文件记录的服务已停止${NC}\n"
 }
 
 # 查看服务状态

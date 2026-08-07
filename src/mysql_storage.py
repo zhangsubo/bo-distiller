@@ -59,6 +59,24 @@ class MySQLStorage(StorageBase):
         """从连接池获取连接"""
         return self.pool.connection()
 
+    @staticmethod
+    def _decode_json(value, default=None):
+        """统一解码 MySQL JSON 字段
+
+        PyMySQL 对 JSON 列通常返回 str，偶尔返回已解析的 dict/list。
+        此 helper 保证对外始终返回 Python 对象。
+        """
+        if value is None:
+            return default if default is not None else {}
+        if isinstance(value, (dict, list)):
+            return value
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                return default if default is not None else {}
+        return default if default is not None else {}
+
     def _init_db(self):
         """初始化数据库表结构"""
         conn = self._get_conn()
@@ -285,14 +303,7 @@ class MySQLStorage(StorageBase):
         except ValueError:
             st = SourceType.LOCAL_FILE
 
-        # 处理 metadata：如果是字符串，解析为字典
-        metadata = row['metadata'] if row['metadata'] else {}
-        if isinstance(metadata, str):
-            import json
-            try:
-                metadata = json.loads(metadata)
-            except:
-                metadata = {}
+        metadata = self._decode_json(row['metadata'], {})
 
         return Article(
             id=row['id'],
@@ -378,7 +389,7 @@ class MySQLStorage(StorageBase):
                     return {
                         'last_sync': row['last_sync'].isoformat() if row['last_sync'] else None,
                         'total_articles': row['total_articles'],
-                        'metadata': row['metadata'] if row['metadata'] else {}
+                        'metadata': self._decode_json(row['metadata'], {})
                     }
         finally:
             conn.close()
@@ -424,7 +435,7 @@ class MySQLStorage(StorageBase):
             with conn.cursor() as cursor:
                 cursor.execute("SELECT name, keywords FROM topics")
                 rows = cursor.fetchall()
-                return {row['name']: row['keywords'] for row in rows}
+                return {row['name']: self._decode_json(row['keywords'], []) for row in rows}
         finally:
             conn.close()
 
@@ -487,10 +498,10 @@ class MySQLStorage(StorageBase):
                 else:
                     cursor.execute("SELECT * FROM knowledge_docs ORDER BY created_at DESC")
                 rows = cursor.fetchall()
-                # 将 datetime 对象转换为字符串
                 for row in rows:
                     if row.get('created_at'):
                         row['created_at'] = row['created_at'].isoformat()
+                    row['metadata'] = self._decode_json(row.get('metadata'), {})
                 return rows
         finally:
             conn.close()
@@ -505,15 +516,7 @@ class MySQLStorage(StorageBase):
                 cursor.execute("SELECT value FROM settings WHERE `key` = %s", (key,))
                 row = cursor.fetchone()
                 if row:
-                    value = row['value']
-                    # 如果返回的是字符串，解析为字典
-                    if isinstance(value, str):
-                        import json
-                        try:
-                            value = json.loads(value)
-                        except:
-                            pass
-                    return value
+                    return self._decode_json(row['value'])
         finally:
             conn.close()
         return None
@@ -552,7 +555,7 @@ class MySQLStorage(StorageBase):
             with conn.cursor() as cursor:
                 cursor.execute("SELECT `key`, value FROM settings")
                 rows = cursor.fetchall()
-                return {row['key']: row['value'] for row in rows}
+                return {row['key']: self._decode_json(row['value'], {}) for row in rows}
         finally:
             conn.close()
 

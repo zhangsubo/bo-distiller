@@ -93,6 +93,10 @@ class CuboxAdapter(SourceAdapter):
         # 解析 JSON 输出
         try:
             cubox_items = json.loads(result.stdout)
+            if not isinstance(cubox_items, list):
+                raise ValueError(
+                    f"cubox-cli 返回了非数组类型: {type(cubox_items).__name__}"
+                )
         except json.JSONDecodeError as e:
             raise Exception(f"Cubox CLI 输出解析失败: {e}")
 
@@ -192,6 +196,10 @@ class CuboxAdapter(SourceAdapter):
         # 解析 JSON 输出
         try:
             cubox_items = json.loads(result.stdout)
+            if not isinstance(cubox_items, list):
+                raise ValueError(
+                    f"cubox-cli 返回了非数组类型: {type(cubox_items).__name__}"
+                )
         except json.JSONDecodeError as e:
             raise Exception(f"Cubox CLI 输出解析失败: {e}")
 

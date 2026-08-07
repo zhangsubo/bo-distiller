@@ -31,7 +31,6 @@ import {
   QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { useConfig, useSaveConfig } from '../../hooks/useConfig';
-import { LLM_MODELS } from '../../utils/constants';
 import type { AppConfig, LLMProvider } from '../../api/types';
 import {
   useProviders,
@@ -244,7 +243,7 @@ const LLMSettings: React.FC = () => {
                 <Form.Item name="default_provider" label="默认 LLM 提供商">
                   <Select
                     options={[
-                      ...LLM_MODELS.map((m) => ({ label: m, value: m })),
+                      ...(providers || []).map((p) => ({ label: p, value: p })),
                       { label: '自定义', value: 'custom' },
                     ]}
                     style={{ width: 200 }}

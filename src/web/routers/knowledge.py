@@ -125,10 +125,11 @@ async def get_knowledge_list():
     # 统计每个主题的条目数（### 标题行）
     for doc in documents:
         try:
-            with open(Path("output") / f"{doc['name']}.md", encoding="utf-8") as f:
+            with open(output_dir / f"{doc['name']}.md", encoding="utf-8") as f:
                 doc["entry_count"] = sum(1 for line in f if line.startswith("### "))
-        except Exception:
-            pass
+        except Exception as e:
+            # 保持默认值 0，记录错误便于排查
+            print(f"[WARN] 统计 {doc['name']} 条目数失败: {e}")
 
     return {"documents": documents}
 

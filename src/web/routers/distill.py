@@ -131,7 +131,7 @@ async def distill_log_stream():
 
         heartbeat_counter = 0
 
-        while task.status in [TaskStatus.PENDING, TaskStatus.RUNNING]:
+        while task.status in [TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.STOPPING]:
             # 发送新日志
             if task.log_seq > last_log_seq:
                 new_count = task.log_seq - last_log_seq

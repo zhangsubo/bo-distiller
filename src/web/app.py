@@ -6,6 +6,7 @@ create_app() 创建 FastAPI 实例：CORS 中间件、注册各 API 路由、
 lifespan 中启动定时同步调度器与微信下载 worker，关闭时停止调度器。
 """
 
+import os
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -63,12 +64,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CORS：默认只允许本机前端，通过 CORS_ORIGINS 环境变量追加额外 origin（逗号分隔）
+    _default_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
+    _extra_origins = [
+        o.strip()
+        for o in os.getenv("CORS_ORIGINS", "").split(",")
+        if o.strip()
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=_default_origins + _extra_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization"],
     )
 
     # 注册 API 路由（顺序与原 web_ui.py 声明顺序一致，
@@ -125,3 +133,7 @@ def create_app() -> FastAPI:
             """)
 
     return app
+
+
+# 创建应用实例供 uvicorn 使用
+app = create_app()

@@ -5,17 +5,20 @@ SQLite 存储管理模块
 """
 
 import json
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from dotenv import load_dotenv
 from rich.console import Console
 
 from .models import Article, SourceInfo, SourceType
 from .storage_base import StorageBase
 
 console = Console()
+load_dotenv(override=True)
 
 # 默认数据库路径
 DEFAULT_DB_PATH = Path(__file__).parent.parent / "data" / "distiller.db"
@@ -444,20 +447,19 @@ def get_storage(
     """
     global _storage
     if _storage is None:
-        # 如果没有指定数据库类型，尝试从配置读取
+        # 数据库连接配置必须先于 ConfigManager 初始化，直接从环境读取以避免循环依赖。
         if db_type is None:
-            try:
-                from .config import get_config_manager
-                config = get_config_manager().load_config()
-                db_type = config.database.type
-
-                if db_type == "mysql" and mysql_config is None:
-                    mysql_config = config.database.mysql
-                elif db_type == "sqlite" and db_path is None:
-                    db_path = Path(config.database.sqlite.get("path", "./data/distiller.db"))
-            except Exception as e:
-                console.print(f"[yellow]无法从配置加载数据库类型，使用默认 SQLite: {e}[/yellow]")
-                db_type = "sqlite"
+            db_type = os.getenv("DATABASE_TYPE", "sqlite").lower()
+            if db_type == "mysql" and mysql_config is None:
+                mysql_config = {
+                    "host": os.getenv("MYSQL_HOST", "127.0.0.1"),
+                    "port": int(os.getenv("MYSQL_PORT", "3306")),
+                    "user": os.getenv("MYSQL_USER", "root"),
+                    "password": os.getenv("MYSQL_PASSWORD", ""),
+                    "database": os.getenv("MYSQL_DATABASE", "distill"),
+                }
+            elif db_type == "sqlite" and db_path is None:
+                db_path = Path(os.getenv("SQLITE_DB_PATH", str(DEFAULT_DB_PATH)))
 
         if db_type == "mysql":
             from .mysql_storage import MySQLStorage

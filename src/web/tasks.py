@@ -2,15 +2,16 @@
 后台任务管理模块
 
 使用 asyncio 和 FastAPI BackgroundTasks 替代 subprocess，
-提供更好的进度跟踪和错误处理。
+提供协作式取消、进度跟踪和错误处理。
 """
 
 import asyncio
+import threading
 import traceback
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Callable, Dict, Optional, List
 
 from rich.console import Console
 
@@ -29,10 +30,16 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    STOPPING = "stopping"
+
+
+class DistillationCancelled(Exception):
+    """蒸馏取消信号异常"""
+    pass
 
 
 class DistillTask:
-    """蒸馏任务"""
+    """蒸馏任务（支持协作式取消）"""
 
     def __init__(
         self,
@@ -40,30 +47,38 @@ class DistillTask:
         incremental: bool = True,
         limit: Optional[int] = None,
     ):
-        self.provider = provider  # 提供商 ID
+        self.provider = provider
         self.incremental = incremental
         self.limit = limit
 
-        self.status = TaskStatus.IDLE
+        self.status = TaskStatus.PENDING
         self.started_at: Optional[datetime] = None
         self.finished_at: Optional[datetime] = None
         self.error: Optional[str] = None
         self.logs: List[str] = []
-        # 单调递增日志序号：logs 列表会按 1000 条截断，len(logs) 会停在 1000，
-        # SSE 必须用它而不是 len(logs) 来判断是否有新日志
         self.log_seq: int = 0
         self.current_step: str = "idle"
 
         self._task: Optional[asyncio.Task] = None
-        self._cancelled = False
+        # 协作式取消信号
+        self._cancel_event = threading.Event()
+
+    def is_cancelled(self) -> bool:
+        """检查是否已请求取消"""
+        return self._cancel_event.is_set()
+
+    def check_cancelled(self):
+        """在关键点调用：如果已取消则抛出异常"""
+        if self._cancel_event.is_set():
+            raise DistillationCancelled("蒸馏任务已被用户取消")
 
     def add_log(self, message: str):
-        """添加日志"""
+        """添加日志（通过 callback 调用，不依赖 stdout 重定向）"""
         timestamp = datetime.now().strftime("%H:%M:%S")
         log_entry = f"[{timestamp}] {message}"
         self.logs.append(log_entry)
         self.log_seq += 1
-        if len(self.logs) > 1000:  # 限制日志条数
+        if len(self.logs) > 1000:
             self.logs = self.logs[-1000:]
 
         # 根据日志内容更新当前步骤
@@ -87,16 +102,19 @@ class DistillTask:
         self.add_log("任务开始...")
 
         try:
-            # 在后台线程中运行同步函数
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
-                None,
-                self._run_distillation_sync,
-            )
+            await loop.run_in_executor(None, self._run_distillation_sync)
 
-            if not self._cancelled:
+            if self._cancel_event.is_set():
+                self.status = TaskStatus.CANCELLED
+                self.add_log("任务已取消")
+            else:
                 self.status = TaskStatus.COMPLETED
                 self.add_log("✓ 任务完成")
+
+        except DistillationCancelled:
+            self.status = TaskStatus.CANCELLED
+            self.add_log("任务已取消")
 
         except Exception as e:
             self.status = TaskStatus.FAILED
@@ -107,88 +125,72 @@ class DistillTask:
         finally:
             self.finished_at = datetime.now()
 
+    def _log_callback(self, message: str):
+        """日志回调：替代 redirect_stdout/stderr，显式传给 add_log"""
+        filter_keywords = ["INFO:", "127.0.0.1:", "HTTP/1.1"]
+        stripped = message.strip() if message else ""
+        if stripped and not any(kw in stripped for kw in filter_keywords):
+            self.add_log(stripped)
+
     def _run_distillation_sync(self):
         """同步执行蒸馏任务（在线程池中运行）"""
+        config_manager = ConfigManager()
+        cache_manager = CacheManager()
+
+        # 创建自定义 Console 捕获输出（不修改进程级 stdout/stderr）
+        from rich.console import Console as RichConsole
+        import io
+        log_stream = io.StringIO()
+        custom_console = RichConsole(file=log_stream, force_terminal=False)
+
         try:
-            config_manager = ConfigManager()
-            cache_manager = CacheManager()
-
-            # 创建一个自定义 console 来捕获输出
-            import io
-            from contextlib import redirect_stdout, redirect_stderr
-
-            # 捕获输出并添加到日志
-            class LogCapture:
-                def __init__(self, task):
-                    self.task = task
-                    # 定义需要过滤掉的日志关键词
-                    self.filter_keywords = [
-                        "使用缓存:",
-                        "已缓存",
-                        "INFO:",
-                        "127.0.0.1:",
-                        "HTTP/1.1",
-                    ]
-
-                def write(self, text):
-                    if text and text.strip():
-                        # 过滤掉非蒸馏相关的日志
-                        stripped = text.strip()
-                        if not any(keyword in stripped for keyword in self.filter_keywords):
-                            self.task.add_log(stripped)
-
-                def flush(self):
-                    pass
-
-            log_capture = LogCapture(self)
-
-            with redirect_stdout(log_capture), redirect_stderr(log_capture):
-                run_distillation(
-                    config_manager=config_manager,
-                    cache=cache_manager,
-                    model=self.provider,  # 传递 provider ID
-                    incremental=self.incremental,
-                    limit=self.limit,
-                    console=console,
-                )
-
-        except Exception as e:
-            raise e
+            run_distillation(
+                config_manager=config_manager,
+                cache=cache_manager,
+                model=self.provider,
+                incremental=self.incremental,
+                limit=self.limit,
+                console=custom_console,
+                cancel_event=self._cancel_event,
+            )
+        except DistillationCancelled:
+            raise
+        finally:
+            # 捕获 console 输出到日志
+            output = log_stream.getvalue()
+            if output:
+                for line in output.splitlines():
+                    if line.strip():
+                        self._log_callback(line)
 
     def cancel(self):
-        """取消任务"""
-        self._cancelled = True
-        if self._task and not self._task.done():
-            self._task.cancel()
-        self.status = TaskStatus.CANCELLED
-        self.add_log("任务已取消")
+        """请求取消任务（协作式：只设置事件，不强杀线程）"""
+        self._cancel_event.set()
+        if self.status == TaskStatus.RUNNING:
+            self.status = TaskStatus.STOPPING
+        self.add_log("正在取消任务...")
 
     def get_progress(self) -> Dict:
         """获取任务进度信息"""
         cache_dir = Path(".cache")
 
-        # 从缓存推断进度
         topics_done = []
         if (cache_dir / "final").exists():
-            # 移除文件名中的 _final 后缀
             topics_done = [
                 f.stem.replace("_final", "")
                 for f in (cache_dir / "final").glob("*.txt")
             ]
 
-        # 使用实时跟踪的步骤，而不是推断
-        step = self.current_step if self.status == TaskStatus.RUNNING else self.current_step
-
         return {
             "status": self.status.value,
-            "step": step,
+            "step": self.current_step,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
             "error": self.error,
             "cache": {
-                "articles_cached": (cache_dir / "articles.pkl").exists(),
-                "cleaned_cached": (cache_dir / "cleaned.pkl").exists(),
-                "topics_cached": (cache_dir / "topics.pkl").exists(),
+                "articles_cached": (cache_dir / "articles.json").exists(),
+                "cleaned_cached": (cache_dir / "cleaned.json").exists(),
+                "topics_cached": (cache_dir / "topics.json").exists(),
                 "batch_count": len(list((cache_dir / "batches").glob("*.txt")))
                 if (cache_dir / "batches").exists()
                 else 0,
@@ -213,7 +215,6 @@ class TaskManager:
     def __init__(self):
         if self._initialized:
             return
-
         self._current_task: Optional[DistillTask] = None
         self._initialized = True
 
@@ -224,10 +225,12 @@ class TaskManager:
         limit: Optional[int] = None,
     ) -> DistillTask:
         """启动新任务"""
-        if self._current_task and self._current_task.status == TaskStatus.RUNNING:
+        # PENDING、RUNNING、STOPPING 都视为占用状态
+        if self._current_task and self._current_task.status in (
+            TaskStatus.PENDING, TaskStatus.RUNNING, TaskStatus.STOPPING
+        ):
             raise RuntimeError("已有任务在运行")
 
-        # 创建新任务
         task = DistillTask(provider=provider, incremental=incremental, limit=limit)
         self._current_task = task
 
@@ -241,7 +244,7 @@ class TaskManager:
         return self._current_task
 
     def stop_task(self):
-        """停止当前任务"""
+        """停止当前任务（协作式取消）"""
         if self._current_task:
             self._current_task.cancel()
 

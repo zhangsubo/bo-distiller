@@ -43,17 +43,15 @@ export function useProviderMetadata(providerId: string, enabled = true) {
 }
 
 /**
- * 获取提供商模型列表
+ * 获取提供商模型列表（API Key 不再通过 URL 传递，React Query key 不含敏感信息）
  */
 export function useProviderModels(
   providerId: string,
-  apiBase?: string,
-  apiKey?: string,
   enabled = true
 ) {
   return useQuery({
-    queryKey: ['llm', 'models', providerId, apiBase, apiKey],
-    queryFn: () => getProviderModels(providerId, apiBase, apiKey),
+    queryKey: ['llm', 'models', providerId],
+    queryFn: () => getProviderModels(providerId),
     enabled: enabled && !!providerId,
     staleTime: 1000 * 60 * 60, // 1 小时
   });
